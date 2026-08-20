@@ -1,0 +1,19 @@
+[project]
+name = "yukiblogs-manager"
+version = "0.1.0"
+description = "Local desktop CMS backend for yukiBlogs"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi",
+  "httpx",
+  "markdown",
+  "markdownify",
+  "python-multipart",
+  "pywebview",
+  "pyyaml",
+  "requests",
+  "uvicorn",
+]
+
+[tool.uv]
+package = false

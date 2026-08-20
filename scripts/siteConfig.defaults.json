@@ -1,0 +1,66 @@
+{
+  "title": "yukiBlogs",
+  "siteUrl": "https://example.com",
+  "faviconUrl": "/next.svg",
+  "authorName": "Your Name",
+  "bio": "记录代码、学习与生活。",
+  "navTitle": "yukiBlogs",
+  "navSuffix": "の",
+  "navAfter": "宝藏之地",
+  "avatarUrl": "/siamese-cat.png",
+  "useGradient": true,
+  "themeColors": ["#a18cd1", "#fbc2eb", "#a1c4fd", "#c2e9fb"],
+  "bgImages": [],
+  "defaultPostCover": "",
+  "photoWallImage": "",
+  "cloudMusicIds": [],
+  "social": {
+    "github": "",
+    "gitee": "",
+    "google": "",
+    "email": "",
+    "qq": "",
+    "wechat": ""
+  },
+  "counts": { "photos": 0 },
+  "chatterTitle": "云端杂谈",
+  "chatterDescription": "记录灵感与日常。",
+  "picBedName": "",
+  "picBedUrl": "",
+  "picBedToken": "",
+  "danmakuList": ["欢迎来到 yukiBlogs", "今天也要保持好奇"],
+  "gitalkConfig": {
+    "clientID": "",
+    "clientSecret": "",
+    "repo": "",
+    "owner": "",
+    "admin": []
+  },
+  "buildDate": "2026-01-01T00:00:00",
+  "footerBadges": [
+    {
+      "name": "Next.js 16",
+      "color": "text-sky-500",
+      "svg": "<path d=\"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z\"/>"
+    },
+    {
+      "name": "React 19",
+      "color": "text-cyan-400",
+      "svg": "<path d=\"M12 22.6l-9.8-5.6V5.6L12 0l9.8 5.6v11.4l-9.8 5.6zm-8.2-6.5l8.2 4.7 8.2-4.7V7.5L12 2.8 3.8 7.5v8.6z\"/>"
+    },
+    {
+      "name": "Tailwind 4",
+      "color": "text-teal-400",
+      "svg": "<path d=\"M12.001,4.8c-3.2,0-5.2,1.6-6,4.8c1.2-1.6,2.6-2.2,4.2-1.8c0.913,0.228,1.565,0.89,2.288,1.624C13.666,10.618,15.027,12,18.001,12c3.2,0,5.2-1.6,6-4.8z\"/>"
+    }
+  ],
+  "icpConfig": { "name": "", "link": "" },
+  "geminiConfig": {
+    "modelId": "gemini-2.5-flash-lite",
+    "systemPrompt": "你是一只简洁、友好的博客猫助手。",
+    "maxOutputTokens": 150,
+    "temperature": 0.85
+  },
+  "friendLinkApplyFormat": "名称：示例站点\n简介：记录代码与生活\n链接：https://example.com\n头像：https://example.com/avatar.png",
+  "enableLevelSystem": false
+}
