@@ -80,4 +80,4 @@ npm run build
 
 ## 许可证
 
-[MIT](LICENSE)
+[CC BY-NC 4.0](../LICENSE)

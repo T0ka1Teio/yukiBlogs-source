@@ -37,7 +37,7 @@ def main():
     # 2. Git 仓库修复
     upstream = os.environ.get(
         "YUKIBLOGS_UPDATE_REMOTE",
-        "https://github.com/heiehiehi/XinghuisamaBlogs.git",
+        "https://github.com/T0ka1Teio/yukiBlogs-source.git",
     )
     if not os.path.exists(".git"):
         print("🪄 初始化 Git 环境...")

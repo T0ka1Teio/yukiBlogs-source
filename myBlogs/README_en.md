@@ -81,4 +81,4 @@ This repository contains the EdgeOne Pages deployment frontend. The complete loc
 
 ## License
 
-[MIT](LICENSE)
+[CC BY-NC 4.0](../LICENSE)
