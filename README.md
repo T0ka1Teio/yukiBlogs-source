@@ -100,7 +100,9 @@ npm run dev
 
 建议将包含个人文章和配置的前端部署仓库设置为 **Private**；此公开仓库只用于发布通用源码。
 
-## EdgeOne Pages 部署
+## EdgeOne Pages 部署（可选）
+
+> 建议提前准备并绑定自己的域名，否则 EdgeOne Pages 的相关功能可能无法正常使用。平台提供的临时访问域名仅建议用于部署测试，不要作为正式站点地址。
 
 1. 为个性化后的 `myBlogs` 创建一个独立 GitHub 仓库，建议设为 Private。
 2. 在本地管理器的部署设置中填写：
@@ -118,13 +120,19 @@ npm run dev
 
 ## 生产环境变量
 
-| 变量 | 用途 |
-| --- | --- |
-| `GEMINI_API_KEY` | AI 猫猫助理 |
-| `GITHUB_OAUTH_CLIENT_SECRET` | GitHub 评论 OAuth 服务端交换 |
-| `KV_REST_API_URL` | Upstash Redis REST 地址 |
-| `KV_REST_API_TOKEN` | Upstash Redis 服务端令牌 |
-| `STATS_OWNER_KEY` | 排除站长浏览器统计的随机长字符串 |
+| 变量 | 用途 | 快速获取 |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | AI 猫猫助理 | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `GITHUB_OAUTH_CLIENT_SECRET` | GitHub 评论 OAuth 服务端交换 | [GitHub Developer Settings](https://github.com/settings/developers) |
+| `KV_REST_API_URL` | Upstash Redis REST 地址 | [Upstash Console](https://console.upstash.com/redis) |
+| `KV_REST_API_TOKEN` | Upstash Redis 服务端令牌 | [Upstash Console](https://console.upstash.com/redis) |
+| `STATS_OWNER_KEY` | 排除站长浏览器统计的随机长字符串 | 本地生成（见下方命令） |
+
+`STATS_OWNER_KEY` 不由第三方平台提供，建议在本地生成：
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
 
 兼容的 Redis 变量名为 `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN`。
 

@@ -100,7 +100,9 @@ After editing content in the local manager:
 
 Keep the personalized frontend deployment repository **Private** when possible. This public repository is for reusable source code only.
 
-## EdgeOne Pages deployment
+## EdgeOne Pages deployment (optional)
+
+> Prepare and bind your own domain before using EdgeOne Pages. Without a custom domain, some EdgeOne Pages features may not work correctly. Use the platform-provided temporary domain for deployment testing only, not as the production site address.
 
 1. Create a separate GitHub repository for the personalized `myBlogs` frontend; Private is recommended.
 2. In the manager deployment settings, configure:
@@ -118,13 +120,19 @@ For SSH synchronization, generate a dedicated Deploy Key through the manager and
 
 ## Production environment variables
 
-| Variable | Purpose |
-| --- | --- |
-| `GEMINI_API_KEY` | AI cat assistant |
-| `GITHUB_OAUTH_CLIENT_SECRET` | Server-side GitHub comment OAuth exchange |
-| `KV_REST_API_URL` | Upstash Redis REST endpoint |
-| `KV_REST_API_TOKEN` | Upstash Redis server token |
-| `STATS_OWNER_KEY` | Random secret used to exclude the owner's browser |
+| Variable | Purpose | Get it quickly |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | AI cat assistant | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `GITHUB_OAUTH_CLIENT_SECRET` | Server-side GitHub comment OAuth exchange | [GitHub Developer Settings](https://github.com/settings/developers) |
+| `KV_REST_API_URL` | Upstash Redis REST endpoint | [Upstash Console](https://console.upstash.com/redis) |
+| `KV_REST_API_TOKEN` | Upstash Redis server token | [Upstash Console](https://console.upstash.com/redis) |
+| `STATS_OWNER_KEY` | Random secret used to exclude the owner's browser | Generate locally (see below) |
+
+`STATS_OWNER_KEY` is not issued by a third-party service. Generate it locally:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
 
 The compatible Redis aliases are `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
 
