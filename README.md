@@ -4,7 +4,13 @@ yukiBlogs 是一个基于 Next.js 16、React 19 和 Tailwind CSS 4 的个人博�
 
 本项目基于 [XinghuisamaBlogs](https://github.com/heiehiehi/XinghuisamaBlogs) 二次开发。
 
-[English](README_en.md) · [中文](README.md)
+[English](README_en.md) · [中文](README.md) · [更新日志](UpdateLog.md)
+
+## 2026-08-21 更新摘要
+
+- 将公开源码整理为不包含个人文章、站点配置、部署路径和密钥的可复用版本，并增加发布前隐私检查。
+- 完善首次初始化、增量更新和 EdgeOne Pages 部署说明，更新时保留本地个人内容与配置。
+- 修复 Markdown 文章表格在阅读页面缺少边框的问题，补充明暗主题、斑马纹和移动端横向滚动。
 
 ## 架构与部署
 

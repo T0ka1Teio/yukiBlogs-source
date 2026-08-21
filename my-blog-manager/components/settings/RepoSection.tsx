@@ -178,7 +178,7 @@ export default function RepoSection() {
                  {isCheckingPath ? "探测中..." : "测试路径 ⚡"}
                </button>
             </div>
-            <input type="text" value={deployData.blogPath} onChange={e => setDeployData({...deployData, blogPath: e.target.value})} className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-xs font-mono outline-none focus:ring-2 focus:ring-indigo-500" placeholder="F:/MyBlog/myBlogs/myBlogs" />
+            <input type="text" value={deployData.blogPath} onChange={e => setDeployData({...deployData, blogPath: e.target.value})} className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-xs font-mono outline-none focus:ring-2 focus:ring-indigo-500" placeholder="C:/path/to/yukiBlogs/myBlogs" />
           </div>
 
           <div className="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-3xl border border-slate-100 dark:border-slate-700/50">

@@ -124,3 +124,91 @@ input[type="number"] {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.2); border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.4); }
+
+/* Markdown tables in the article preview. Tailwind's reset removes the
+   browser's default borders, so keep the table frame explicit here. */
+#article-content table {
+  width: 100%;
+  margin: 1.5rem 0;
+  border: 1px solid rgba(100, 116, 139, 0.45);
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+#article-content th,
+#article-content td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  border-right: 1px solid rgba(100, 116, 139, 0.35);
+  border-bottom: 1px solid rgba(100, 116, 139, 0.35);
+}
+
+#article-content th {
+  background: rgba(99, 102, 241, 0.12);
+  color: rgb(30, 41, 59);
+  font-weight: 800;
+}
+
+#article-content th:last-child,
+#article-content td:last-child {
+  border-right: 0;
+}
+
+#article-content tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+#article-content tbody tr:nth-child(even) {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+#article-content tbody tr:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.dark #article-content table {
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(15, 23, 42, 0.28);
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.2);
+}
+
+.dark #article-content th,
+.dark #article-content td {
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+.dark #article-content th {
+  background: rgba(129, 140, 248, 0.2);
+  color: rgb(241, 245, 249);
+}
+
+.dark #article-content tbody tr:nth-child(even) {
+  background: rgba(148, 163, 184, 0.07);
+}
+
+.dark #article-content tbody tr:hover {
+  background: rgba(129, 140, 248, 0.12);
+}
+
+@media (max-width: 640px) {
+  #article-content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #article-content th,
+  #article-content td {
+    min-width: 7rem;
+    padding: 0.625rem 0.75rem;
+  }
+}

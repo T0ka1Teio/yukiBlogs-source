@@ -35,10 +35,8 @@ def main():
         sys.exit(1)
 
     # 2. Git 仓库修复
-    upstream = os.environ.get(
-        "YUKIBLOGS_UPDATE_REMOTE",
-        "https://github.com/T0ka1Teio/yukiBlogs-source.git",
-    )
+    custom_upstream = os.environ.get("YUKIBLOGS_UPDATE_REMOTE")
+    upstream = custom_upstream or "https://github.com/T0ka1Teio/yukiBlogs-source.git"
     if not os.path.exists(".git"):
         print("🪄 初始化 Git 环境...")
         if not run_cmd([git_exe, "init"]):
@@ -56,8 +54,10 @@ def main():
 
     # 3. 拉取更新
     print_step("[1/4] 连接云端获取最新代码...")
-    if not run_cmd([git_exe, "fetch", "origin", "main"]):
+    fetch_source = upstream if custom_upstream else "origin"
+    if not run_cmd([git_exe, "fetch", fetch_source, "main"]):
         sys.exit(1)
+    update_ref = "FETCH_HEAD" if custom_upstream else "origin/main"
 
     # 4. 精准替换文件（再也不怕空格和换行符了！）
     print_step("[2/4] 执行核心文件精准替换...")
@@ -95,7 +95,7 @@ def main():
         "my-blog-manager/next.config.ts"
     ]
 
-    if not run_cmd([git_exe, "checkout", "origin/main", "--", *files_to_update]):
+    if not run_cmd([git_exe, "checkout", update_ref, "--", *files_to_update]):
         sys.exit(1)
 
     # 5. 安装依赖

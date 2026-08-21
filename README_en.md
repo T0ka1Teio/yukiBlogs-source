@@ -4,7 +4,13 @@ yukiBlogs is a personal blog system built with Next.js 16, React 19, and Tailwin
 
 This project is derived from [XinghuisamaBlogs](https://github.com/heiehiehi/XinghuisamaBlogs).
 
-[English](README_en.md) · [中文](README.md)
+[English](README_en.md) · [中文](README.md) · [Changelog](UpdateLog.md)
+
+## 2026-08-21 update summary
+
+- Rebuilt the public source tree as a reusable snapshot without personal posts, site configuration, deployment paths, or credentials, and added a pre-publish privacy check.
+- Clarified first-run initialization, incremental updates, and EdgeOne Pages deployment while preserving local content and configuration during upgrades.
+- Fixed missing borders on Markdown tables in article views, including light/dark styling, zebra rows, and horizontal scrolling on mobile.
 
 ## Architecture and deployment
 

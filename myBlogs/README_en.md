@@ -13,6 +13,12 @@ A personal blog frontend built with Next.js and a glassmorphism visual style. It
 - Upstash Redis
 - Tencent Cloud EdgeOne Pages
 
+## 2026-08-21 Update Summary
+
+- Fixed missing outer and cell borders for Markdown tables in article views.
+- Added header styling, zebra rows, light/dark themes, and horizontal scrolling on mobile.
+- Published a privacy-clean public source tree that does not track personal content or configuration.
+
 ## 2026-08-20 Update Summary
 
 - The primary site can use a custom domain and be deployed and accelerated by Tencent Cloud EdgeOne Pages.
