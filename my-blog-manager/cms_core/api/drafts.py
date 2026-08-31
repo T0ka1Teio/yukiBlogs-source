@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 import time
 import yaml
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
@@ -28,6 +29,35 @@ def get_manager_drafts_dir() -> str:
 
 MAX_MARKDOWN_IMPORT_BYTES = 5 * 1024 * 1024
 FRONTMATTER_PATTERN = re.compile(r"\A---\s*\r?\n(.*?)\r?\n---\s*(?:\r?\n|\Z)", re.DOTALL)
+LOCAL_COVER_PATTERN = re.compile(r"\A/uploads/covers/(cover-\d{13}-[0-9a-f]{8}\.jpg)\Z")
+HTML_CODE_BLOCK_PATTERN = re.compile(
+    r"(<pre><code(?:\s+[^>]*)?>)(.*?)(</code></pre>)",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _mirror_local_cover_to_runtime(cover_url: object) -> bool:
+    """Keep a newly published local cover visible to the running standalone UI."""
+    if not isinstance(cover_url, str):
+        return False
+    match = LOCAL_COVER_PATTERN.fullmatch(cover_url.strip())
+    if not match:
+        return False
+
+    source = Path(PROJECT_ROOT) / "public" / "uploads" / "covers" / match.group(1)
+    runtime_public = Path(PROJECT_ROOT) / ".next" / "standalone" / "public"
+    if not source.is_file() or not runtime_public.is_dir():
+        return False
+
+    destination = runtime_public / "uploads" / "covers" / match.group(1)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+    try:
+        shutil.copy2(source, temporary)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return True
 
 
 def _metadata_text(value) -> str:
@@ -36,6 +66,19 @@ def _metadata_text(value) -> str:
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return str(value).strip()
+
+
+def _normalize_editor_html(html_content: str) -> str:
+    """Remove the structural newline Markdown renderers append to fenced code."""
+    def normalize_code_block(match: re.Match) -> str:
+        code = match.group(2)
+        if code.endswith("\r\n"):
+            code = code[:-2]
+        elif code.endswith("\n"):
+            code = code[:-1]
+        return f"{match.group(1)}{code}{match.group(3)}"
+
+    return HTML_CODE_BLOCK_PATTERN.sub(normalize_code_block, html_content)
 
 
 def _parse_imported_markdown(source: str, filename: str) -> dict:
@@ -75,9 +118,11 @@ def _parse_imported_markdown(source: str, filename: str) -> dict:
     else:
         raise ValueError("tags 必须是字符串或列表")
 
-    html_content = markdown.markdown(
-        body.strip(),
-        extensions=["fenced_code", "tables", "nl2br", "sane_lists"],
+    html_content = _normalize_editor_html(
+        markdown.markdown(
+            body.strip(),
+            extensions=["fenced_code", "tables", "nl2br", "sane_lists"],
+        )
     )
 
     return {
@@ -262,7 +307,9 @@ async def get_draft(request: Request):
                         pass
 
             # 🌟 将 Markdown 转换为编辑器认识的 HTML
-            html_content = markdown.markdown(md_body, extensions=['fenced_code', 'tables', 'nl2br'])
+            html_content = _normalize_editor_html(
+                markdown.markdown(md_body, extensions=['fenced_code', 'tables', 'nl2br'])
+            )
 
             draft_data = {
                 "id": raw_id,
@@ -327,7 +374,6 @@ async def sync_local_operations(request: Request):
     operations = payload.get("operations", [])
     # 🌟 修复：用 PROJECT_ROOT 替换 os.getcwd()
     base_dir = PROJECT_ROOT
-    drafts_dir = get_manager_drafts_dir()
     results = []
 
     for op in operations:
@@ -375,6 +421,7 @@ async def sync_local_operations(request: Request):
             fm = {
                 "title": data.get("title", ""),
                 "date": final_date,
+                "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "tags": data.get("tags", []),
                 "mood": data.get("mood", ""),
                 "cover": data.get("cover", ""),
@@ -392,6 +439,8 @@ async def sync_local_operations(request: Request):
             with open(save_path, "w", encoding="utf-8") as f:
                 f.write(final_text)
 
+            _mirror_local_cover_to_runtime(fm["cover"])
+
             if doc_type == "about":
                 synced, sync_detail = sync_about_to_configured_blog()
                 if synced:
@@ -399,14 +448,7 @@ async def sync_local_operations(request: Request):
                 else:
                     results.append(f"⚠️ 关于页已保存，但{sync_detail}")
 
-            draft_path = os.path.join(drafts_dir, f"{doc_id}.json")
-            if os.path.exists(draft_path):
-                try:
-                    os.remove(draft_path)
-                except:
-                    pass
-
-            results.append(f"✅ 已发布: {fm['title']}")
+            results.append(f"✅ 已发布并保留草稿: {fm['title']}")
 
     return {"success": True, "message": "\n".join(results)}
 

@@ -5,7 +5,7 @@ import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import { albums as initialAlbums, Album, Photo } from '../../data/albums';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, Save, AlertTriangle, Sparkles, Edit3, CloudUpload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X, Save, AlertTriangle, Edit3, CloudUpload } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
 import { useToast } from '../../components/ToastProvider';
 import FloatingImageTool from '../../components/editor/FloatingImageTool';
@@ -71,6 +71,7 @@ export default function PhotoWallPage() {
       <FloatingImageTool
         key={isImgToolOpen ? 'tool-open' : 'tool-closed'}
         isOpen={isImgToolOpen}
+        multiple={imgToolTarget === 'photo'}
         onClose={() => setIsImgToolOpen(false)}
         onInsert={(url) => {
           if (imgToolTarget === 'album') {
@@ -79,6 +80,18 @@ export default function PhotoWallPage() {
             setPhotoModal(prev => ({ ...prev, data: { ...prev.data, url: url } }));
           }
           setIsImgToolOpen(false);
+        }}
+        onInsertMany={(urls) => {
+          if (imgToolTarget !== 'photo' || !currentAlbum || urls.length === 0) return;
+          const uploadedPhotos: Photo[] = urls.map(url => ({ url, caption: '' }));
+          const next = editableAlbums.map(album => album.id === currentAlbum.id
+            ? { ...album, photos: [...uploadedPhotos, ...album.photos] }
+            : album);
+          const updatedAlbum = next.find(album => album.id === currentAlbum.id);
+          setEditableAlbums(next);
+          if (updatedAlbum) setCurrentAlbum(updatedAlbum);
+          setPhotoModal(prev => ({ ...prev, isOpen: false }));
+          syncToQueue(next);
         }}
       />
 

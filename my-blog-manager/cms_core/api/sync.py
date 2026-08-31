@@ -14,13 +14,20 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_API_DIR, "..", ".."))
 DEPLOY_CONFIG_FILE = os.path.join(PROJECT_ROOT, "data", "deploy_config.json")
 
 # 需要镜像覆盖的文件夹 (先清空目标，再全量复制)
-SYNC_DIRS = ["posts", "chatters", "moments", "public/uploads/covers"]
+SYNC_DIRS = [
+    "posts",
+    "chatters",
+    "moments",
+    "public/uploads/covers",
+]
 # 需要精确覆盖的单文件
 SYNC_FILES = [
     "app/about/about.md",
     "data/albums.ts",
     "data/friends.ts",
     "data/projects.ts",
+    "components/CroppedBackgroundImage.tsx",
+    "lib/backgroundCrop.ts",
     "siteConfig.ts"
 ]
 

@@ -11,9 +11,21 @@
   "useGradient": true,
   "themeColors": ["#a18cd1", "#fbc2eb", "#a1c4fd", "#c2e9fb"],
   "bgImages": [],
+  "bgImageCrops": {},
   "defaultPostCover": "",
   "photoWallImage": "",
   "cloudMusicIds": [],
+  "musicTracks": [],
+  "musicSources": [
+    {
+      "id": "netease-direct",
+      "name": "网易云直链",
+      "kind": "builtin",
+      "enabled": true,
+      "version": "内置",
+      "platforms": ["wy"]
+    }
+  ],
   "social": {
     "github": "",
     "gitee": "",
@@ -28,6 +40,8 @@
   "picBedName": "",
   "picBedUrl": "",
   "picBedToken": "",
+  "picBedProfiles": {},
+  "picBedProvider": "",
   "danmakuList": ["欢迎来到 yukiBlogs", "今天也要保持好奇"],
   "gitalkConfig": {
     "clientID": "",

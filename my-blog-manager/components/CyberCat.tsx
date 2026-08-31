@@ -1,7 +1,19 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls, useMotionValue } from 'framer-motion';
+
+const CAT_POSITION_STORAGE_KEY = 'yukiblogs:manager-cyber-cat-position:v1';
+
+type CatPositionRatio = {
+  x: number;
+  y: number;
+};
+
+function clampRatio(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(1, Math.max(0, number)) : 0;
+}
 
 export default function CyberCat() {
   const [isPetted, setIsPetted] = useState(false);
@@ -9,8 +21,78 @@ export default function CyberCat() {
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [isPositionReady, setIsPositionReady] = useState(false);
 
   const chatTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const catBoundsRef = useRef<HTMLDivElement | null>(null);
+  const catRef = useRef<HTMLDivElement | null>(null);
+  const positionRatioRef = useRef<CatPositionRatio>({ x: 0, y: 0 });
+  const resizeFrameRef = useRef<number | null>(null);
+  const justDraggedRef = useRef(false);
+  const dragReleaseFrameRef = useRef<number | null>(null);
+  const dragControls = useDragControls();
+  const catX = useMotionValue(0);
+  const catY = useMotionValue(0);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(CAT_POSITION_STORAGE_KEY) || 'null') as Partial<CatPositionRatio> | null;
+      if (stored) {
+        positionRatioRef.current = {
+          x: clampRatio(stored.x),
+          y: clampRatio(stored.y),
+        };
+      }
+    } catch {
+      localStorage.removeItem(CAT_POSITION_STORAGE_KEY);
+    }
+
+    const applyPosition = () => {
+      const bounds = catBoundsRef.current;
+      const cat = catRef.current;
+      if (!bounds || !cat) return;
+      const availableX = Math.max(0, bounds.clientWidth - cat.offsetWidth);
+      const availableY = Math.max(0, bounds.clientHeight - cat.offsetHeight);
+      catX.set(-availableX * positionRatioRef.current.x);
+      catY.set(-availableY * positionRatioRef.current.y);
+      setIsPositionReady(true);
+    };
+
+    const handleResize = () => {
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = requestAnimationFrame(applyPosition);
+    };
+
+    resizeFrameRef.current = requestAnimationFrame(applyPosition);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      if (dragReleaseFrameRef.current !== null) cancelAnimationFrame(dragReleaseFrameRef.current);
+    };
+  }, [catX, catY]);
+
+  const persistCatPosition = () => {
+    const bounds = catBoundsRef.current;
+    const cat = catRef.current;
+    if (!bounds || !cat) return;
+    const availableX = Math.max(0, bounds.clientWidth - cat.offsetWidth);
+    const availableY = Math.max(0, bounds.clientHeight - cat.offsetHeight);
+    const position = {
+      x: availableX > 0 ? clampRatio(-catX.get() / availableX) : 0,
+      y: availableY > 0 ? clampRatio(-catY.get() / availableY) : 0,
+    };
+    positionRatioRef.current = position;
+    try {
+      localStorage.setItem(CAT_POSITION_STORAGE_KEY, JSON.stringify(position));
+    } catch {
+      // 存储不可用时仍保留当前会话内的位置。
+    }
+    dragReleaseFrameRef.current = requestAnimationFrame(() => {
+      justDraggedRef.current = false;
+      dragReleaseFrameRef.current = null;
+    });
+  };
 
   // --- 💬 说话功能 ---
   const speak = (text: string, duration = 6000) => {
@@ -23,6 +105,7 @@ export default function CyberCat() {
 
   // --- 🖱️ 交互事件：摸猫猫 ---
   const handlePetCat = () => {
+    if (justDraggedRef.current) return;
     if (isPetted) return;
     setIsPetted(true);
     speak("呼噜噜... 摸得本喵很舒服喵~", 2000);
@@ -108,12 +191,30 @@ export default function CyberCat() {
 
 
   return (
+    <div
+      ref={catBoundsRef}
+      className="pointer-events-none fixed bottom-[72px] left-16 right-16 top-24 z-[9999]"
+      aria-label="小猫可拖动区域"
+    >
     <motion.div
+      ref={catRef}
       drag
-      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-      dragElastic={0.1}
-      whileDrag={{ scale: 1.1, cursor: "grabbing" }}
-      className="fixed bottom-20 right-20 z-[9999] flex flex-col items-center group cursor-grab active:cursor-grabbing"
+      dragControls={dragControls}
+      dragListener={false}
+      dragConstraints={catBoundsRef}
+      dragElastic={0.06}
+      dragMomentum={false}
+      onDragStart={() => {
+        justDraggedRef.current = true;
+        if (dragReleaseFrameRef.current !== null) cancelAnimationFrame(dragReleaseFrameRef.current);
+      }}
+      onDragEnd={persistCatPosition}
+      initial={false}
+      animate={{ opacity: isPositionReady ? 1 : 0 }}
+      whileDrag={{ scale: 1.07, filter: 'drop-shadow(0 18px 24px rgba(79, 70, 229, 0.28))' }}
+      transition={{ opacity: { duration: 0.2 }, scale: { type: 'spring', stiffness: 420, damping: 28 } }}
+      style={{ x: catX, y: catY, touchAction: 'none' }}
+      className="pointer-events-auto absolute bottom-0 right-0 flex flex-col items-center group"
     >
       {/* 💬 聊天气泡 */}
       <div className="relative w-full flex justify-center mb-6">
@@ -167,8 +268,13 @@ export default function CyberCat() {
 
         {/* 猫咪图片容器 */}
         <div
-          className="w-[120px] h-[120px] relative cursor-pointer"
+          className="w-[120px] h-[120px] relative cursor-grab active:cursor-grabbing"
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            dragControls.start(event);
+          }}
           onClick={handlePetCat}
+          title="拖动煤球调整位置，点击摸摸它"
         >
           <style>{`
             .cat-sprite {
@@ -239,5 +345,6 @@ export default function CyberCat() {
         )}
       </AnimatePresence>
     </motion.div>
+    </div>
   );
 }

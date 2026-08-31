@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import TimelineNode from './TimelineNode';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, LayoutGrid, ListTree, Calendar, Hash, ArrowUp } from 'lucide-react';
+import { Search, Sparkles, LayoutGrid, ListTree, Calendar, Hash, ArrowUp, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import ViewsBadge from './ViewsBadge';
 
@@ -206,10 +206,20 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
                         <div className="relative h-28 sm:h-36 md:h-40 overflow-hidden">
                           <img src={post.cover} alt={post.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                          {/* 🌟 日期标签微缩 */}
-                          <span className="absolute bottom-2 left-2 md:bottom-3 md:left-4 text-white/90 text-[9px] md:text-xs font-mono font-bold bg-black/40 backdrop-blur-sm px-1.5 py-0.5 md:px-2 md:py-1 rounded flex items-center gap-1">
-                            <Calendar size={10} className="md:w-3 md:h-3"/> {post.date.split(' ')[0]}
-                          </span>
+                          {/* 发布与最近更新时间 */}
+                          <div className="absolute bottom-2 left-2 right-14 md:bottom-3 md:left-4 md:right-20 flex min-w-0 items-center gap-1.5 md:gap-2 overflow-hidden rounded bg-black/40 px-1.5 py-0.5 font-mono text-[8px] font-bold text-white/90 backdrop-blur-sm md:px-2 md:py-1 md:text-[10px]">
+                            <span className="flex min-w-0 shrink items-center gap-1" title={`发布时间：${post.date}`}>
+                              <Calendar size={10} className="shrink-0 text-indigo-300 md:h-3 md:w-3" />
+                              <span className="hidden truncate sm:inline">{post.date.split(' ')[0]}</span>
+                              <span className="truncate sm:hidden">{post.date.split(' ')[0].slice(5)}</span>
+                            </span>
+                            <span className="h-3 w-px shrink-0 bg-white/25" aria-hidden="true" />
+                            <span className="flex min-w-0 shrink items-center gap-1" title={`最近更新时间：${post.updated}`}>
+                              <Pencil size={10} className="shrink-0 text-red-400 md:h-3 md:w-3" aria-hidden="true" />
+                              <span className="hidden truncate sm:inline">{post.updated.split(' ')[0]}</span>
+                              <span className="truncate sm:hidden">{post.updated.split(' ')[0].slice(5)}</span>
+                            </span>
+                          </div>
                           {/* 🌟 封面右下角：浏览次数 */}
                           <ViewsBadge kind="post" slug={post.slug} className="absolute bottom-2 right-2 md:bottom-3 md:right-3" />
                         </div>

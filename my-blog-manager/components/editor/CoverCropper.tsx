@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Crop, Loader2, Minus, Plus, RotateCcw, X } from 'lucide-react';
+import type { BackgroundCrop } from '../../lib/backgroundCrop';
+import { buildCropImageCandidates } from '../../lib/cropImageSources';
 import { useToast } from '../ToastProvider';
 
 export const COVER_CROP_WIDTH = 1280;
@@ -17,11 +19,25 @@ interface CoverCropperProps {
   isOpen: boolean;
   imageUrl: string;
   onClose: () => void;
-  onComplete: (url: string) => void;
+  onComplete: (url: string, crop?: BackgroundCrop) => void;
+  outputWidth?: number;
+  outputHeight?: number;
+  title?: string;
+  description?: string;
+  ratioLabel?: string;
+  successMessage?: string;
+  reuseSourceUrl?: boolean;
+  initialCrop?: BackgroundCrop;
 }
 
-export function getCoverCropMetrics(imageWidth: number, imageHeight: number, zoom: number) {
-  const baseScale = Math.max(COVER_CROP_WIDTH / imageWidth, COVER_CROP_HEIGHT / imageHeight);
+export function getCoverCropMetrics(
+  imageWidth: number,
+  imageHeight: number,
+  zoom: number,
+  outputWidth = COVER_CROP_WIDTH,
+  outputHeight = COVER_CROP_HEIGHT,
+) {
+  const baseScale = Math.max(outputWidth / imageWidth, outputHeight / imageHeight);
   const scale = baseScale * zoom;
   const drawWidth = imageWidth * scale;
   const drawHeight = imageHeight * scale;
@@ -29,13 +45,25 @@ export function getCoverCropMetrics(imageWidth: number, imageHeight: number, zoo
   return {
     drawWidth,
     drawHeight,
-    maxOffsetX: Math.max(0, (drawWidth - COVER_CROP_WIDTH) / 2),
-    maxOffsetY: Math.max(0, (drawHeight - COVER_CROP_HEIGHT) / 2),
+    maxOffsetX: Math.max(0, (drawWidth - outputWidth) / 2),
+    maxOffsetY: Math.max(0, (drawHeight - outputHeight) / 2),
   };
 }
 
-function clampOffset(offset: Offset, image: HTMLImageElement, zoom: number): Offset {
-  const metrics = getCoverCropMetrics(image.naturalWidth, image.naturalHeight, zoom);
+function clampOffset(
+  offset: Offset,
+  image: HTMLImageElement,
+  zoom: number,
+  outputWidth: number,
+  outputHeight: number,
+): Offset {
+  const metrics = getCoverCropMetrics(
+    image.naturalWidth,
+    image.naturalHeight,
+    zoom,
+    outputWidth,
+    outputHeight,
+  );
   return {
     x: Math.max(-metrics.maxOffsetX, Math.min(metrics.maxOffsetX, offset.x)),
     y: Math.max(-metrics.maxOffsetY, Math.min(metrics.maxOffsetY, offset.y)),
@@ -55,8 +83,35 @@ function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
-export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: CoverCropperProps) {
+async function getBackendBase() {
+  const response = await fetch(`/backend_config.json?t=${Date.now()}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error('无法读取控制台后端配置');
+  const config = await response.json() as { api_port?: number };
+  if (!Number.isInteger(config.api_port)) throw new Error('本地后端端口无效');
+  return `http://127.0.0.1:${config.api_port}`;
+}
+
+function normalizeDimension(value: number | undefined, fallback: number) {
+  return Number.isFinite(value) && Number(value) > 0 ? Math.round(Number(value)) : fallback;
+}
+
+export default function CoverCropper({
+  isOpen,
+  imageUrl,
+  onClose,
+  onComplete,
+  outputWidth,
+  outputHeight,
+  title = '裁剪封面',
+  description,
+  ratioLabel,
+  successMessage,
+  reuseSourceUrl = false,
+  initialCrop,
+}: CoverCropperProps) {
   const { showToast } = useToast();
+  const cropWidth = normalizeDimension(outputWidth, COVER_CROP_WIDTH);
+  const cropHeight = normalizeDimension(outputHeight, COVER_CROP_HEIGHT);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -90,30 +145,80 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
     if (!isOpen || !imageUrl) return;
 
     let cancelled = false;
-    const nextImage = new Image();
-    nextImage.crossOrigin = 'anonymous';
-    nextImage.referrerPolicy = 'no-referrer';
-    nextImage.decoding = 'async';
+    let nextImage: HTMLImageElement | null = null;
 
     setImage(null);
     setLoadError('');
-    setZoom(1);
-    setOffset({ x: 0, y: 0 });
+    setZoom(initialCrop?.zoom || 1);
+    setOffset({
+      x: (initialCrop?.offsetX || 0) * cropWidth,
+      y: (initialCrop?.offsetY || 0) * cropHeight,
+    });
 
-    nextImage.onload = () => {
-      if (!cancelled) setImage(nextImage);
+    const loadImage = async () => {
+      let backendBase: string | null = null;
+      if (/^https?:\/\//i.test(imageUrl)) {
+        try {
+          backendBase = await getBackendBase();
+        } catch {
+          // 后端暂不可用时保留浏览器直连候选。
+        }
+      }
+
+      if (cancelled) return;
+      const candidates = buildCropImageCandidates(imageUrl, backendBase, reuseSourceUrl);
+
+      const tryCandidate = (candidateIndex: number) => {
+        const candidate = candidates[candidateIndex];
+        if (cancelled) return;
+        if (!candidate) {
+          setLoadError('图片读取失败，请检查链接或图片访问权限后重试');
+          return;
+        }
+
+        const candidateImage = new Image();
+        nextImage = candidateImage;
+        if (candidate.crossOrigin) candidateImage.crossOrigin = candidate.crossOrigin;
+        if (candidate.referrerPolicy) candidateImage.referrerPolicy = candidate.referrerPolicy;
+        candidateImage.decoding = 'async';
+        candidateImage.onload = () => {
+          if (cancelled) return;
+          const restoredZoom = Math.max(1, Math.min(3, initialCrop?.zoom || 1));
+          const restoredOffset = clampOffset(
+            {
+              x: (initialCrop?.offsetX || 0) * cropWidth,
+              y: (initialCrop?.offsetY || 0) * cropHeight,
+            },
+            candidateImage,
+            restoredZoom,
+            cropWidth,
+            cropHeight,
+          );
+          setImage(candidateImage);
+          setZoom(restoredZoom);
+          setOffset(restoredOffset);
+        };
+        candidateImage.onerror = () => {
+          candidateImage.onload = null;
+          candidateImage.onerror = null;
+          tryCandidate(candidateIndex + 1);
+        };
+        candidateImage.src = candidate.source;
+      };
+
+      tryCandidate(0);
     };
-    nextImage.onerror = () => {
-      if (!cancelled) setLoadError('图片读取失败，请检查链接后重试');
-    };
-    nextImage.src = imageUrl;
+
+    void loadImage();
 
     return () => {
       cancelled = true;
-      nextImage.onload = null;
-      nextImage.onerror = null;
+      if (nextImage) {
+        nextImage.onload = null;
+        nextImage.onerror = null;
+      }
     };
-  }, [imageUrl, isOpen]);
+  }, [cropHeight, cropWidth, imageUrl, initialCrop?.offsetX, initialCrop?.offsetY, initialCrop?.zoom, isOpen, reuseSourceUrl]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -122,22 +227,28 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    const metrics = getCoverCropMetrics(image.naturalWidth, image.naturalHeight, zoom);
-    const drawX = (COVER_CROP_WIDTH - metrics.drawWidth) / 2 + offset.x;
-    const drawY = (COVER_CROP_HEIGHT - metrics.drawHeight) / 2 + offset.y;
+    const metrics = getCoverCropMetrics(
+      image.naturalWidth,
+      image.naturalHeight,
+      zoom,
+      cropWidth,
+      cropHeight,
+    );
+    const drawX = (cropWidth - metrics.drawWidth) / 2 + offset.x;
+    const drawY = (cropHeight - metrics.drawHeight) / 2 + offset.y;
 
-    context.clearRect(0, 0, COVER_CROP_WIDTH, COVER_CROP_HEIGHT);
+    context.clearRect(0, 0, cropWidth, cropHeight);
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = 'high';
     context.drawImage(image, drawX, drawY, metrics.drawWidth, metrics.drawHeight);
-  }, [image, offset, zoom]);
+  }, [cropHeight, cropWidth, image, offset, zoom]);
 
   const updateZoom = useCallback((nextZoom: number) => {
     if (!image) return;
     const normalizedZoom = Math.max(1, Math.min(3, nextZoom));
     setZoom(normalizedZoom);
-    setOffset((current) => clampOffset(current, image, normalizedZoom));
-  }, [image]);
+    setOffset((current) => clampOffset(current, image, normalizedZoom, cropWidth, cropHeight));
+  }, [cropHeight, cropWidth, image]);
 
   const resetCrop = () => {
     setZoom(1);
@@ -160,12 +271,12 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
     if (!drag || drag.pointerId !== event.pointerId || !image) return;
 
     const rect = event.currentTarget.getBoundingClientRect();
-    const outputScale = COVER_CROP_WIDTH / rect.width;
+    const outputScale = cropWidth / rect.width;
     const nextOffset = {
       x: drag.offset.x + (event.clientX - drag.startX) * outputScale,
       y: drag.offset.y + (event.clientY - drag.startY) * outputScale,
     };
-    setOffset(clampOffset(nextOffset, image, zoom));
+    setOffset(clampOffset(nextOffset, image, zoom, cropWidth, cropHeight));
   };
 
   const stopDragging = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -181,16 +292,24 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
     const canvas = canvasRef.current;
     if (!canvas || !image || isSaving) return;
 
+    if (reuseSourceUrl) {
+      onComplete(imageUrl, {
+        zoom,
+        offsetX: offset.x / cropWidth,
+        offsetY: offset.y / cropHeight,
+      });
+      showToast(successMessage || '✅ 显示区域已保存，图片继续使用原始 URL', 'success');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const blob = await canvasToJpeg(canvas);
-      const configResponse = await fetch(`/backend_config.json?t=${Date.now()}`);
-      if (!configResponse.ok) throw new Error('无法读取控制台后端配置');
-      const config = await configResponse.json();
+      const backendBase = await getBackendBase();
 
       const formData = new FormData();
-      formData.append('file', blob, `cover-16x9-${Date.now()}.jpg`);
-      const uploadResponse = await fetch(`http://127.0.0.1:${config.api_port}/api/picbed/upload-cover`, {
+      formData.append('file', blob, `cover-${cropWidth}x${cropHeight}-${Date.now()}.jpg`);
+      const uploadResponse = await fetch(`${backendBase}/api/picbed/upload-cover`, {
         method: 'POST',
         body: formData,
       });
@@ -202,7 +321,7 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
       }
 
       onComplete(result.url);
-      showToast('✅ 封面已按 16:9 裁剪并保存', 'success');
+      showToast(successMessage || '✅ 封面已按 16:9 裁剪并保存', 'success');
     } catch (error) {
       const message = error instanceof DOMException && error.name === 'SecurityError'
         ? '该图片来源不允许浏览器裁剪，请换用照片墙中的图片'
@@ -224,7 +343,7 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
         >
           <motion.button
             type="button"
-            aria-label="关闭封面裁剪"
+            aria-label={`关闭${title}`}
             initial={false}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -244,9 +363,11 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
             <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-5 dark:border-slate-700/70">
               <div>
                 <h3 id="cover-crop-title" className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white">
-                  <Crop size={20} className="text-indigo-500" /> 裁剪封面
+                  <Crop size={20} className="text-indigo-500" /> {title}
                 </h3>
-                <p className="mt-1 text-xs font-bold text-slate-400">拖动图片选择区域，输出比例固定为 16:9</p>
+                <p className="mt-1 text-xs font-bold text-slate-400">
+                  {description || '拖动图片选择区域，输出比例固定为 16:9'}
+                </p>
               </div>
               <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-red-500 hover:text-white dark:bg-slate-800">
                 <X size={18} />
@@ -254,16 +375,19 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
             </div>
 
             <div className="p-6">
-              <div className="relative aspect-video w-full overflow-hidden rounded-[28px] bg-slate-950 shadow-inner">
+              <div
+                className="relative w-full overflow-hidden rounded-[28px] bg-slate-950 shadow-inner"
+                style={{ aspectRatio: `${cropWidth} / ${cropHeight}` }}
+              >
                 <canvas
                   ref={canvasRef}
-                  width={COVER_CROP_WIDTH}
-                  height={COVER_CROP_HEIGHT}
+                  width={cropWidth}
+                  height={cropHeight}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={stopDragging}
                   onPointerCancel={stopDragging}
-                  className="block aspect-video h-full w-full touch-none cursor-grab select-none active:cursor-grabbing"
+                  className="block h-full w-full touch-none cursor-grab select-none active:cursor-grabbing"
                 />
 
                 <div className="pointer-events-none absolute inset-0">
@@ -276,7 +400,7 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
 
                 {!image && !loadError && (
                   <div className="absolute inset-0 flex items-center justify-center gap-3 bg-slate-950/80 text-sm font-bold text-slate-300">
-                    <Loader2 size={20} className="animate-spin text-indigo-400" /> 正在读取封面
+                    <Loader2 size={20} className="animate-spin text-indigo-400" /> 正在读取图片
                   </div>
                 )}
                 {loadError && (
@@ -285,7 +409,7 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
                   </div>
                 )}
                 <div className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1.5 text-[10px] font-black tracking-wider text-white backdrop-blur-md">
-                  16:9 · 1280 × 720
+                  {ratioLabel || `16:9 · ${cropWidth} × ${cropHeight}`}
                 </div>
               </div>
 
@@ -319,7 +443,7 @@ export default function CoverCropper({ isOpen, imageUrl, onClose, onComplete }: 
                 </button>
                 <button type="button" onClick={saveCrop} disabled={!image || Boolean(loadError) || isSaving} className="flex min-w-36 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 px-6 py-3 text-xs font-black text-white shadow-lg shadow-indigo-500/25 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50">
                   {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Crop size={16} />}
-                  {isSaving ? '正在上传...' : '应用裁剪'}
+                  {isSaving ? '正在上传...' : reuseSourceUrl ? '应用显示区域' : '应用裁剪'}
                 </button>
               </div>
             </div>

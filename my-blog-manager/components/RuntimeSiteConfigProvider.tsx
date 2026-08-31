@@ -5,6 +5,8 @@ import { siteConfig as bundledSiteConfig } from '../siteConfig';
 
 export type RuntimeSiteConfig = typeof bundledSiteConfig;
 
+export const RUNTIME_SITE_CONFIG_UPDATED_EVENT = 'yukiblogs:runtime-site-config-updated';
+
 const RuntimeSiteConfigContext = createContext<RuntimeSiteConfig>(bundledSiteConfig);
 
 export function RuntimeSiteConfigProvider({ children }: { children: ReactNode }) {
@@ -12,15 +14,26 @@ export function RuntimeSiteConfigProvider({ children }: { children: ReactNode })
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/runtime-config?t=${Date.now()}`, { cache: 'no-store' })
-      .then(response => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
-      .then((payload: { siteConfig?: Partial<RuntimeSiteConfig> }) => {
-        if (!cancelled && payload.siteConfig) {
-          setRuntimeConfig({ ...bundledSiteConfig, ...payload.siteConfig } as RuntimeSiteConfig);
-        }
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    let requestVersion = 0;
+    const refreshRuntimeConfig = () => {
+      const version = ++requestVersion;
+      fetch(`/api/runtime-config?t=${Date.now()}`, { cache: 'no-store' })
+        .then(response => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+        .then((payload: { siteConfig?: Partial<RuntimeSiteConfig> }) => {
+          if (!cancelled && version === requestVersion && payload.siteConfig) {
+            setRuntimeConfig({ ...bundledSiteConfig, ...payload.siteConfig } as RuntimeSiteConfig);
+          }
+        })
+        .catch(() => {});
+    };
+
+    refreshRuntimeConfig();
+    window.addEventListener(RUNTIME_SITE_CONFIG_UPDATED_EVENT, refreshRuntimeConfig);
+    return () => {
+      cancelled = true;
+      requestVersion += 1;
+      window.removeEventListener(RUNTIME_SITE_CONFIG_UPDATED_EVENT, refreshRuntimeConfig);
+    };
   }, []);
 
   return (

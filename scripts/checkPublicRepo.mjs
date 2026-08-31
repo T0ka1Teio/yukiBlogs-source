@@ -9,6 +9,7 @@ const tracked = execFileSync('git', ['ls-files', '-z'])
 const forbiddenPaths = new Set([
   'my-blog-manager/data/site_config.json',
   'my-blog-manager/data/deploy_config.json',
+  'my-blog-manager/window_config.json',
   'my-blog-manager/siteConfig.ts',
   'myBlogs/siteConfig.ts',
   'my-blog-manager/data/albums.ts',
@@ -27,8 +28,11 @@ const forbiddenPrefixes = [
   'my-blog-manager/posts/',
   'my-blog-manager/chatters/',
   'my-blog-manager/drafts/',
+  'my-blog-manager/manager_data/',
+  'my-blog-manager/moments/',
   'myBlogs/posts/',
   'myBlogs/chatters/',
+  'myBlogs/moments/',
   'my-blog-manager/public/uploads/',
   'myBlogs/public/uploads/',
 ];

@@ -33,10 +33,12 @@ Thumbs.db
 # Test and launcher runtime state
 **/.pytest_cache/
 my-blog-manager/public/backend_config.json
+my-blog-manager/window_config.json
 
 # Personal runtime configuration (generated from scripts/siteConfig.defaults.json)
 my-blog-manager/data/site_config.json
 my-blog-manager/data/deploy_config.json
+my-blog-manager/manager_data/
 my-blog-manager/siteConfig.ts
 myBlogs/siteConfig.ts
 
@@ -53,8 +55,10 @@ myBlogs/data/projects.ts
 my-blog-manager/posts/
 my-blog-manager/chatters/
 my-blog-manager/drafts/
+my-blog-manager/moments/
 myBlogs/posts/
 myBlogs/chatters/
+myBlogs/moments/
 my-blog-manager/public/uploads/
 myBlogs/public/uploads/
 myBlogs/public/CNAME

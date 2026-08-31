@@ -65,6 +65,10 @@ interface MusicContextType {
 const MusicContext = createContext<MusicContextType | null>(null);
 
 export function MusicProvider({ children }: { children: ReactNode }) {
+  const configuredTracks = (siteConfig as unknown as { musicTracks?: Array<{ key?: string }> }).musicTracks || [];
+  const trackConfigKey = configuredTracks.map((track) => track.key || '').join(',');
+  const legacyConfigKey = (siteConfig.cloudMusicIds || []).join(',');
+  const hasConfiguredMusic = trackConfigKey.length > 0 || legacyConfigKey.length > 0;
   const [playlist, setPlaylist] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -73,7 +77,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [lyrics, setLyrics] = useState<{ time: number; text: string }[]>([]);
   const [currentLyric, setCurrentLyric] = useState("正在连接高可用神经云端...");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(hasConfiguredMusic);
 
   // 🌟 2. 新增音量和播放模式状态
   const [volume, setVolumeState] = useState(1);
@@ -86,7 +90,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
     const fetchMusicData = async () => {
       try {
-        const res = await fetch(`/api/music?ids=${siteConfig.cloudMusicIds.join(',')}`);
+        const res = await fetch('/api/music');
         const rawResults = await res.json();
 
         const mergedPlaylist = rawResults
@@ -111,11 +115,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    if (siteConfig.cloudMusicIds?.length > 0) fetchMusicData();
-    else setIsLoading(false);
+    if (hasConfiguredMusic) fetchMusicData();
 
     return () => { isMounted = false; };
-  }, []);
+  }, [trackConfigKey, legacyConfigKey, hasConfiguredMusic]);
 
   useEffect(() => {
     if (playlist.length === 0) return;

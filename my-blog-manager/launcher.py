@@ -125,12 +125,57 @@ def wait_for_port(port, timeout=60):
     return False
 
 class WindowAPI:
+    def __init__(self):
+        self._is_maximized = False
+        self._state_lock = threading.Lock()
+
+    def _set_maximized(self, value):
+        with self._state_lock:
+            changed = self._is_maximized != bool(value)
+            self._is_maximized = bool(value)
+        if changed:
+            try:
+                state = "true" if self._is_maximized else "false"
+                webview.windows[0].evaluate_js(
+                    "window.dispatchEvent(new CustomEvent('yukiblogs:window-state', "
+                    f"{{ detail: {{ maximized: {state} }} }}))"
+                )
+            except Exception:
+                pass
+
+    def get_window_state(self):
+        window_size = load_window_size()
+        return {
+            "maximized": self._is_maximized,
+            "width": int(window_size.get("width", 1440)),
+            "height": int(window_size.get("height", 900)),
+        }
+
+    def mark_maximized(self):
+        self._set_maximized(True)
+
+    def mark_restored(self):
+        self._set_maximized(False)
+
     def resize_window(self, width, height):
+        if self._is_maximized:
+            webview.windows[0].restore()
+            self._set_maximized(False)
         save_window_size(width, height)
         webview.windows[0].resize(int(width), int(height))
-        return True
+        return self.get_window_state()
+
     def minimize_window(self): webview.windows[0].minimize()
-    def maximize_window(self): webview.windows[0].toggle_fullscreen()
+
+    def maximize_window(self):
+        if self._is_maximized:
+            webview.windows[0].restore()
+            self._set_maximized(False)
+        else:
+            webview.windows[0].maximize()
+            self._set_maximized(True)
+        return self.get_window_state()
+
     def close_window(self): on_closed()
 
 def run_api(port):
@@ -202,6 +247,8 @@ if __name__ == "__main__":
     )
 
     window.events.shown += on_shown
+    window.events.maximized += api.mark_maximized
+    window.events.restored += api.mark_restored
     window.events.closed += on_closed
 
     try:

@@ -11,10 +11,16 @@ class ConfigStoreTests(unittest.TestCase):
         config = {
             "title": "yukiBlogs",
             "picBedToken": "private-token",
+            "picBedProvider": "cloudflare-imgbed",
+            "picBedProfiles": {
+                "cloudflare-imgbed": {"url": "https://imgbed.example", "token": "private-token"},
+            },
             "gitalkConfig": {"clientID": "public-id", "clientSecret": "private-secret"},
         }
         result = public_config(config)
         self.assertNotIn("picBedToken", result)
+        self.assertNotIn("picBedProvider", result)
+        self.assertNotIn("picBedProfiles", result)
         self.assertEqual(result["gitalkConfig"], {"clientID": "public-id"})
 
     def test_apply_updates_is_whitelisted_and_generates_typescript(self):
@@ -28,16 +34,44 @@ class ConfigStoreTests(unittest.TestCase):
                 {
                     "title": "after",
                     "siteUrl": "https://blog.example.com",
+                    "musicTracks": [{"key": "wy:1", "platform": "wy", "id": "1"}],
+                    "musicSources": [{"id": "builtin", "enabled": True}],
+                    "bgImageCrops": {"https://img.example/photo.jpg": {"zoom": 1.2, "offsetX": 0.1, "offsetY": 0}},
+                    "picBedProvider": "cloudflare-imgbed",
+                    "picBedProfiles": {
+                        "cloudflare-imgbed": {"url": "https://imgbed.example", "token": "secret"},
+                    },
                     "unexpected": "blocked",
                 },
                 config_path=config_path,
                 manager_ts_path=ts_path,
             )
 
-            self.assertEqual(applied, ["title", "siteUrl"])
+            self.assertEqual(
+                applied,
+                [
+                    "title",
+                    "siteUrl",
+                    "musicTracks",
+                    "musicSources",
+                    "bgImageCrops",
+                    "picBedProvider",
+                    "picBedProfiles",
+                ],
+            )
             self.assertEqual(
                 config,
-                {"title": "after", "siteUrl": "https://blog.example.com"},
+                {
+                    "title": "after",
+                    "siteUrl": "https://blog.example.com",
+                    "musicTracks": [{"key": "wy:1", "platform": "wy", "id": "1"}],
+                    "musicSources": [{"id": "builtin", "enabled": True}],
+                    "bgImageCrops": {"https://img.example/photo.jpg": {"zoom": 1.2, "offsetX": 0.1, "offsetY": 0}},
+                    "picBedProvider": "cloudflare-imgbed",
+                    "picBedProfiles": {
+                        "cloudflare-imgbed": {"url": "https://imgbed.example", "token": "secret"},
+                    },
+                },
             )
             self.assertNotIn("unexpected", config_path.read_text(encoding="utf-8"))
             self.assertIn('"title": "after"', ts_path.read_text(encoding="utf-8"))

@@ -66,6 +66,12 @@ const MusicContext = createContext<MusicContextType | null>(null);
 
 export function MusicProvider({ children }: { children: ReactNode }) {
   const siteConfig = useRuntimeSiteConfig();
+  const configuredTracks = (siteConfig as unknown as { musicTracks?: Array<{ key?: string }> }).musicTracks || [];
+  const configuredSources = (siteConfig as unknown as { musicSources?: unknown[] }).musicSources || [];
+  const trackConfigKey = JSON.stringify(configuredTracks);
+  const sourceConfigKey = JSON.stringify(configuredSources);
+  const legacyConfigKey = (siteConfig.cloudMusicIds || []).join(',');
+  const hasConfiguredMusic = configuredTracks.length > 0 || legacyConfigKey.length > 0;
   const [playlist, setPlaylist] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -74,7 +80,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [lyrics, setLyrics] = useState<{ time: number; text: string }[]>([]);
   const [currentLyric, setCurrentLyric] = useState("正在连接高可用神经云端...");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(hasConfiguredMusic);
 
   // 🌟 2. 新增音量和播放模式状态
   const [volume, setVolumeState] = useState(1);
@@ -87,7 +93,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
     const fetchMusicData = async () => {
       try {
-        const res = await fetch(`/api/music?ids=${siteConfig.cloudMusicIds.join(',')}`);
+        const res = await fetch(`/api/music?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const rawResults = await res.json();
 
         const mergedPlaylist = rawResults
@@ -103,8 +110,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           }));
 
         if (isMounted) {
-          if (mergedPlaylist.length > 0) setPlaylist(mergedPlaylist);
-          else setCurrentLyric("云端链路受阻");
+          setPlaylist(mergedPlaylist);
+          setCurrentIndex(0);
+          if (mergedPlaylist.length === 0) setCurrentLyric("云端链路受阻");
           setIsLoading(false);
         }
       } catch (error) {
@@ -112,11 +120,26 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    if (siteConfig.cloudMusicIds?.length > 0) fetchMusicData();
-    else setIsLoading(false);
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    setPlaylist([]);
+    setCurrentIndex(0);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+    setLyrics([]);
+
+    if (hasConfiguredMusic) {
+      setIsLoading(true);
+      setCurrentLyric("正在连接高可用神经云端...");
+      void fetchMusicData();
+    } else {
+      setIsLoading(false);
+      setCurrentLyric("暂无音乐");
+    }
 
     return () => { isMounted = false; };
-  }, [siteConfig.cloudMusicIds]);
+  }, [trackConfigKey, sourceConfigKey, legacyConfigKey, hasConfiguredMusic]);
 
   useEffect(() => {
     if (playlist.length === 0) return;

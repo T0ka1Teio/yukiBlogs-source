@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { Calendar, Pencil } from "lucide-react";
 import ViewsBadge from './ViewsBadge';
 
 export default function TimelineNode({ post, index }: { post: any, index: number }) {
@@ -40,11 +41,15 @@ export default function TimelineNode({ post, index }: { post: any, index: number
 
           {/* 下半部分：文本信息 */}
           <div className="p-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-indigo-600 dark:text-indigo-400 font-bold text-[11px] flex items-center gap-1 uppercase tracking-wider">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] font-bold tracking-wide">
+              <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400" title={`发布时间：${post.date}`}>
+                <Calendar size={13} />
                 {post.date}
-              </div>
+              </span>
+              <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300" title={`最近更新时间：${post.updated}`}>
+                <Pencil size={13} className="text-red-500" aria-hidden="true" />
+                {post.updated}
+              </span>
             </div>
 
             <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-3 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2 leading-tight">

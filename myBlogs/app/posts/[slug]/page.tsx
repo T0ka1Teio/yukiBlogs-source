@@ -107,6 +107,7 @@ async function getPostData(slug: string) {
     toc: extractToc(content),
     title: data.title,
     date: data.date,
+    updated: String(data.updated || data.updatedAt || data.modified || data.date || '1970-01-01'),
     tags: data.tags && Array.isArray(data.tags) ? data.tags : [],
     cover: data.cover || siteConfig.defaultPostCover
   };
@@ -157,6 +158,11 @@ export default async function Post({ params }: { params: Promise<{ slug: string 
                   <div className="flex items-center gap-1.5 md:gap-2 text-indigo-700 dark:text-indigo-400 font-bold bg-white/30 dark:bg-slate-900/50 px-3 md:px-4 py-1.5 md:py-2 rounded-full w-max text-xs md:text-sm transition-colors duration-700 shadow-sm border border-white/20 dark:border-white/5">
                     <svg className="w-3 h-3 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     写作时间：{postData.date}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 md:gap-2 text-red-600 dark:text-red-400 font-bold bg-white/30 dark:bg-slate-900/50 px-3 md:px-4 py-1.5 md:py-2 rounded-full w-max text-xs md:text-sm transition-colors duration-700 shadow-sm border border-red-200/50 dark:border-red-400/10">
+                    <svg className="w-3 h-3 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 3.487a2.25 2.25 0 113.182 3.182L8.25 18.463 3.75 19.5l1.037-4.5L16.862 3.487zM14.25 6.099l3.182 3.182" /></svg>
+                    更新时间：{postData.updated}
                   </div>
 
 

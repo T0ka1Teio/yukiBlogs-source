@@ -4,10 +4,11 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
 import { projectsData as initialProjects, Project } from '../../data/projects';
-import { Plus, Pencil, Trash2, AlertTriangle, Save, Edit3, X, Sparkles, Code2 } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, Save, Edit3, Sparkles, Code2 } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
 import { useToast } from '../../components/ToastProvider';
 import { loadRuntimeContent } from '../../lib/runtimeContentClient';
+import { formatProjectTags, parseProjectTags } from '../../lib/projectForm';
 
 export default function ProjectsBoard() {
   const { addOperation } = useOperations();
@@ -20,6 +21,7 @@ export default function ProjectsBoard() {
   // 2. 弹窗状态
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null; name: string | null }>({ isOpen: false, id: null, name: null });
   const [projectModal, setProjectModal] = useState<{ isOpen: boolean; mode: 'add' | 'edit'; data: Partial<Project> }>({ isOpen: false, mode: 'add', data: {} });
+  const [projectTagsInput, setProjectTagsInput] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -51,8 +53,14 @@ export default function ProjectsBoard() {
     showToast("📍 变更已加入待处理队列，请在 Navbar 点击更新本地", "info");
   };
 
+  const openProjectModal = (mode: 'add' | 'edit', data: Partial<Project>) => {
+    setProjectTagsInput(formatProjectTags(data.tags));
+    setProjectModal({ isOpen: true, mode, data });
+  };
+
   const handleSaveProject = () => {
     const { mode, data } = projectModal;
+    const parsedTags = parseProjectTags(projectTagsInput);
     if (!data.name || !data.githubUrl) {
       showToast("名称和 GitHub 地址是必填项", "warning");
       return;
@@ -66,11 +74,11 @@ export default function ProjectsBoard() {
         githubUrl: data.githubUrl!,
         description: data.description || '暂无描述。',
         icon: data.icon || '🚀',
-        tags: data.tags || ['OpenSource']
+        tags: parsedTags.length > 0 ? parsedTags : ['OpenSource']
       };
       next = [newProj, ...editableProjects];
     } else {
-      next = editableProjects.map(p => p.id === data.id ? { ...p, ...data } as Project : p);
+      next = editableProjects.map(p => p.id === data.id ? { ...p, ...data, tags: parsedTags } as Project : p);
     }
     setEditableProjects(next);
     syncToQueue(next);
@@ -127,7 +135,7 @@ export default function ProjectsBoard() {
                  </div>
                  <input type="text" value={projectModal.data.githubUrl || ''} onChange={e => setProjectModal({...projectModal, data: {...projectModal.data, githubUrl: e.target.value}})} className="w-full bg-slate-100 dark:bg-black/20 rounded-2xl px-5 py-3 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 border-none" placeholder="GitHub URL" />
                  <textarea value={projectModal.data.description || ''} onChange={e => setProjectModal({...projectModal, data: {...projectModal.data, description: e.target.value}})} className="w-full bg-slate-100 dark:bg-black/20 rounded-2xl px-5 py-3 dark:text-white h-24 outline-none resize-none focus:ring-2 focus:ring-indigo-500 border-none" placeholder="项目描述..." />
-                 <input type="text" value={projectModal.data.tags?.join(', ') || ''} onChange={e => setProjectModal({...projectModal, data: {...projectModal.data, tags: e.target.value.split(',').map(t => t.trim())}})} className="w-full bg-slate-100 dark:bg-black/20 rounded-2xl px-5 py-3 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 border-none" placeholder="技术栈 (逗号分隔)" />
+                 <input type="text" value={projectTagsInput} onChange={e => setProjectTagsInput(e.target.value)} className="w-full bg-slate-100 dark:bg-black/20 rounded-2xl px-5 py-3 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 border-none" placeholder="技术栈 (逗号分隔)" />
                </div>
                <div className="mt-8 flex gap-3">
                  <button onClick={() => setProjectModal({ ...projectModal, isOpen: false })} className="flex-1 py-3 text-slate-500 font-bold uppercase text-xs">取消</button>
@@ -160,7 +168,7 @@ export default function ProjectsBoard() {
       <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
 
         {/* 👇 新建项目虚线矩阵 */}
-        <motion.div layout onClick={() => setProjectModal({ isOpen: true, mode: 'add', data: { icon: '🚀', tags: [] } })} className="group cursor-pointer flex flex-col items-center justify-center min-h-[320px] rounded-[40px] border-4 border-dashed border-slate-300 dark:border-slate-700 bg-white/10 hover:border-indigo-500 hover:bg-indigo-500/5 transition-all duration-500">
+        <motion.div layout onClick={() => openProjectModal('add', { icon: '🚀', tags: [] })} className="group cursor-pointer flex flex-col items-center justify-center min-h-[320px] rounded-[40px] border-4 border-dashed border-slate-300 dark:border-slate-700 bg-white/10 hover:border-indigo-500 hover:bg-indigo-500/5 transition-all duration-500">
             <div className="w-16 h-16 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-indigo-500 group-hover:text-white transition-all shadow-md group-hover:rotate-90">
               <Plus size={40} />
             </div>
@@ -173,7 +181,7 @@ export default function ProjectsBoard() {
 
               {/* 👇 悬浮管理按钮 */}
               <div className="absolute top-8 right-8 z-30 flex gap-2 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0">
-                  <button onClick={(e) => { e.preventDefault(); setProjectModal({ isOpen: true, mode: 'edit', data: project }); }} className="w-9 h-9 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-lg hover:scale-110 transition-transform"><Edit3 size={16}/></button>
+                  <button onClick={(e) => { e.preventDefault(); openProjectModal('edit', project); }} className="w-9 h-9 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-lg hover:scale-110 transition-transform"><Edit3 size={16}/></button>
                   <button onClick={(e) => { e.preventDefault(); setDeleteModal({ isOpen: true, id: project.id, name: project.name }); }} className="w-9 h-9 rounded-xl bg-red-500 text-white flex items-center justify-center shadow-lg hover:scale-110 transition-transform"><Trash2 size={16}/></button>
               </div>
 

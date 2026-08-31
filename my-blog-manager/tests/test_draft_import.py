@@ -91,6 +91,30 @@ date: 2026-08-19
         self.assertNotIn("<h1>", stored["content"])
         self.assertEqual(stored["content"], "<p>第一段内容。</p>")
 
+    def test_imported_fenced_code_does_not_gain_a_trailing_blank_line(self):
+        markdown_source = """# 代码示例
+
+```text
+第一行
+
+第三行
+```
+"""
+
+        response = self.client.post(
+            "/api/drafts/import",
+            files={"file": ("code.md", markdown_source.encode("utf-8"), "text/markdown")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        stored_path = self.project_root / "manager_data" / "drafts" / f"{response.json()['id']}.json"
+        stored = json.loads(stored_path.read_text(encoding="utf-8"))
+        self.assertIn(
+            '<pre><code class="language-text">第一行\n\n第三行</code></pre>',
+            stored["content"],
+        )
+        self.assertNotIn("第三行\n</code>", stored["content"])
+
     def test_import_rejects_non_markdown_files_without_writing_draft(self):
         response = self.client.post(
             "/api/drafts/import",

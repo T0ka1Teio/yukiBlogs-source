@@ -1,7 +1,10 @@
+import asyncio
+import socket
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -56,6 +59,37 @@ class CoverUploadTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"], "裁剪封面必须是 JPEG 图片")
+
+    def test_image_proxy_rejects_local_network_targets(self):
+        response = self.client.get(
+            "/api/picbed/proxy-image",
+            params={"url": "http://127.0.0.1/private-image.jpg"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "图片链接不能指向本机或内网地址")
+
+    def test_public_hostname_may_resolve_to_desktop_proxy_fake_ip(self):
+        fake_loop = SimpleNamespace(
+            getaddrinfo=AsyncMock(
+                return_value=[
+                    (
+                        socket.AddressFamily.AF_INET,
+                        socket.SocketKind.SOCK_STREAM,
+                        0,
+                        "",
+                        ("198.18.0.202", 443),
+                    )
+                ]
+            )
+        )
+
+        with patch.object(picbed.asyncio, "get_running_loop", return_value=fake_loop):
+            asyncio.run(picbed.validate_public_image_url("https://img.example.com/photo.jpg"))
+
+    def test_literal_desktop_proxy_fake_ip_remains_blocked(self):
+        with self.assertRaisesRegex(Exception, "图片链接不能指向本机或内网地址"):
+            asyncio.run(picbed.validate_public_image_url("http://198.18.0.202/photo.jpg"))
 
 
 if __name__ == "__main__":

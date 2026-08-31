@@ -1,13 +1,13 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOperations } from '../context/OperationContext';
 import { executeOperation } from '../lib/operationExecutor';
 import { useToast } from './ToastProvider';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Maximize2, Minimize2, Minus, X } from 'lucide-react';
 import { useRuntimeSiteConfig } from './RuntimeSiteConfigProvider';
 
 export default function Navbar() {
@@ -15,6 +15,8 @@ export default function Navbar() {
   const [showNav, setShowNav] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isOpBoxOpen, setIsOpBoxOpen] = useState(false);
+  const operationBoxRef = useRef<HTMLDivElement>(null);
+  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
 
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [targetBlogPath, setTargetBlogPath] = useState("");
@@ -22,6 +24,19 @@ export default function Navbar() {
   const pathname = usePathname();
   const { operations, removeOperation, clearOperations } = useOperations();
   const { showToast } = useToast();
+
+  useEffect(() => {
+    if (!isOpBoxOpen) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!operationBoxRef.current?.contains(event.target as Node)) {
+        setIsOpBoxOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
+  }, [isOpBoxOpen]);
 
   useEffect(() => {
     const fetchPath = async () => {
@@ -55,6 +70,30 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
 
+  useEffect(() => {
+    type WindowStateEvent = CustomEvent<{ maximized?: boolean }>;
+    const applyWindowState = (value: unknown) => {
+      if (value && typeof value === 'object' && 'maximized' in value) {
+        setIsWindowMaximized(Boolean((value as { maximized?: boolean }).maximized));
+      }
+    };
+    const handleWindowState = (event: Event) => {
+      applyWindowState((event as WindowStateEvent).detail);
+    };
+    const readWindowState = () => {
+      const pywebviewApi = (window as Window & { pywebview?: { api?: { get_window_state?: () => Promise<unknown> } } }).pywebview?.api;
+      void pywebviewApi?.get_window_state?.().then(applyWindowState).catch(() => {});
+    };
+
+    window.addEventListener('yukiblogs:window-state', handleWindowState);
+    window.addEventListener('pywebviewready', readWindowState);
+    readWindowState();
+    return () => {
+      window.removeEventListener('yukiblogs:window-state', handleWindowState);
+      window.removeEventListener('pywebviewready', readWindowState);
+    };
+  }, []);
+
   // 🌟 这里新增了 /tree 路由
   const navLinks = [
     { name: '首页', href: '/' },
@@ -71,20 +110,23 @@ export default function Navbar() {
     { name: '⚙️ 设置', href: '/settings' },
   ];
 
+  const getWindowApi = () => (window as Window & {
+    pywebview?: { api?: {
+      minimize_window?: () => Promise<unknown>;
+      maximize_window?: () => Promise<{ maximized?: boolean }>;
+      close_window?: () => Promise<unknown>;
+    } };
+  }).pywebview?.api;
+
   const handleMinimize = () => {
-    if (typeof window !== 'undefined' && (window as any).pywebview?.api) {
-      (window as any).pywebview.api.minimize_window();
-    }
+    void getWindowApi()?.minimize_window?.();
   };
-  const handleMaximize = () => {
-    if (typeof window !== 'undefined' && (window as any).pywebview?.api) {
-      (window as any).pywebview.api.maximize_window();
-    }
+  const handleMaximize = async () => {
+    const state = await getWindowApi()?.maximize_window?.();
+    if (state) setIsWindowMaximized(Boolean(state.maximized));
   };
   const handleClose = () => {
-    if (typeof window !== 'undefined' && (window as any).pywebview?.api) {
-      (window as any).pywebview.api.close_window();
-    }
+    void getWindowApi()?.close_window?.();
   };
 
   // 🌟 监控增强版更新逻辑
@@ -156,10 +198,41 @@ export default function Navbar() {
 
   return (
     <>
-      <header className={`w-full fixed top-0 left-0 right-0 z-[100] transition-all duration-500 border-b ${showNav ? 'translate-y-0' : '-translate-y-full'} bg-white/40 dark:bg-slate-900/50 backdrop-blur-xl border-white/20 dark:border-white/5 shadow-sm pywebview-drag-region`}>
-        <div className="w-[95%] max-w-7xl mx-auto h-16 flex items-center justify-between px-4 box-border">
+      <header className={`w-full fixed top-0 left-0 right-0 z-[100] transition-all duration-500 border-b ${showNav ? 'translate-y-0' : '-translate-y-full'} bg-white/40 dark:bg-slate-900/50 backdrop-blur-xl border-white/20 dark:border-white/5 shadow-sm`}>
+        <div className="w-[95%] max-w-7xl mx-auto h-16 flex items-center px-4 box-border">
+          <div className="mr-5 flex shrink-0 items-center gap-2 rounded-full border border-white/30 bg-white/35 px-2.5 py-2 shadow-sm backdrop-blur-md dark:border-slate-700/70 dark:bg-slate-900/35" aria-label="窗口控制">
+            <button
+              type="button"
+              onClick={handleMinimize}
+              className="group grid h-3.5 w-3.5 place-items-center rounded-full bg-yellow-400 shadow-sm transition-transform hover:scale-110 hover:bg-yellow-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70"
+              aria-label="最小化窗口"
+              title="最小化"
+            >
+              <Minus size={9} strokeWidth={3} className="text-yellow-950 opacity-0 transition-opacity group-hover:opacity-100" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleMaximize()}
+              className="group grid h-3.5 w-3.5 place-items-center rounded-full bg-green-400 shadow-sm transition-transform hover:scale-110 hover:bg-green-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/70"
+              aria-label={isWindowMaximized ? '恢复窗口' : '最大化窗口'}
+              title={isWindowMaximized ? '恢复窗口' : '最大化'}
+            >
+              {isWindowMaximized
+                ? <Minimize2 size={8} strokeWidth={3} className="text-green-950 opacity-0 transition-opacity group-hover:opacity-100" />
+                : <Maximize2 size={8} strokeWidth={3} className="text-green-950 opacity-0 transition-opacity group-hover:opacity-100" />}
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="group grid h-3.5 w-3.5 place-items-center rounded-full bg-red-400 shadow-sm transition-transform hover:scale-110 hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
+              aria-label="关闭窗口"
+              title="关闭"
+            >
+              <X size={8} strokeWidth={3} className="text-red-950 opacity-0 transition-opacity group-hover:opacity-100" />
+            </button>
+          </div>
 
-          <Link href="/" className="text-xl font-black text-slate-800 dark:text-white tracking-tighter">
+          <Link href="/" className="shrink-0 text-xl font-black text-slate-800 dark:text-white tracking-tighter">
             {siteConfig.navTitle}
             <span className="text-indigo-500 mx-1">
               {siteConfig.navSuffix || 'の'}
@@ -167,7 +240,12 @@ export default function Navbar() {
             {siteConfig.navAfter}
           </Link>
 
-          <div className="flex items-center gap-6" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <div
+            className={`min-w-4 flex-1 self-stretch ${isWindowMaximized ? '' : 'pywebview-drag-region cursor-grab active:cursor-grabbing'}`}
+            aria-hidden="true"
+          />
+
+          <div className="flex items-center gap-6">
             <nav className="hidden lg:flex gap-8 text-sm font-bold">
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href} className={`relative py-1 transition-colors ${pathname === link.href ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-200'}`}>
@@ -176,7 +254,7 @@ export default function Navbar() {
               ))}
             </nav>
 
-            <div className="relative">
+            <div ref={operationBoxRef} className="relative">
               <button onClick={() => setIsOpBoxOpen(!isOpBoxOpen)} className="relative w-10 h-10 rounded-xl bg-white/50 dark:bg-slate-800/50 flex items-center justify-center text-lg hover:scale-105 transition-all border border-white/20 shadow-sm cursor-pointer">
                 📥
                 {operations.length > 0 && (
@@ -224,18 +302,6 @@ export default function Navbar() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-
-            <div className="flex items-center gap-2 ml-2 pl-6 border-l border-slate-300/50 dark:border-slate-600/50">
-              <button onClick={handleMinimize} className="w-3.5 h-3.5 rounded-full bg-yellow-400 hover:bg-yellow-500 flex items-center justify-center group transition-colors shadow-sm cursor-pointer z-[101]">
-                <span className="opacity-0 group-hover:opacity-100 text-[8px] text-yellow-900 font-black">-</span>
-              </button>
-              <button onClick={handleMaximize} className="w-3.5 h-3.5 rounded-full bg-green-400 hover:bg-green-500 flex items-center justify-center group transition-colors shadow-sm cursor-pointer z-[101]">
-                <span className="opacity-0 group-hover:opacity-100 text-[8px] text-green-900 font-black">+</span>
-              </button>
-              <button onClick={handleClose} className="w-3.5 h-3.5 rounded-full bg-red-400 hover:bg-red-500 flex items-center justify-center group transition-colors shadow-sm cursor-pointer z-[101]">
-                <span className="opacity-0 group-hover:opacity-100 text-[8px] text-red-900 font-black">×</span>
-              </button>
             </div>
 
           </div>

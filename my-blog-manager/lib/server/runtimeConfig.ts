@@ -33,7 +33,13 @@ type RuntimeSiteConfig = {
   gitalkConfig?: Partial<GitalkRuntimeConfig>;
 };
 
-const PRIVATE_CONFIG_KEYS = new Set(['picBedName', 'picBedUrl', 'picBedToken']);
+const PRIVATE_CONFIG_KEYS = new Set([
+  'picBedName',
+  'picBedUrl',
+  'picBedToken',
+  'picBedProvider',
+  'picBedProfiles',
+]);
 
 export function readRuntimeSiteConfig(): RuntimeSiteConfig {
   const contentRoot = process.env.YUKIBLOGS_CONTENT_ROOT;

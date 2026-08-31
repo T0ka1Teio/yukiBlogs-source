@@ -19,6 +19,26 @@ import DanmakuSection from '../../components/settings/DanmakuSection';
 import FooterSection from '../../components/settings/FooterSection';
 // 👇 🌟 引入刚写的 AI 配置组件
 import AICatSection from '../../components/settings/AICatSection';
+import type { MusicSourceConfig, MusicTrack } from '../../lib/music/types';
+import { RUNTIME_SITE_CONFIG_UPDATED_EVENT } from '../../components/RuntimeSiteConfigProvider';
+
+async function getBackendBase() {
+  const response = await fetch(`/backend_config.json?t=${Date.now()}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error('无法读取本地后端配置');
+  const config = await response.json() as { api_port?: number };
+  if (!Number.isInteger(config.api_port)) throw new Error('本地后端端口无效');
+  return `http://127.0.0.1:${config.api_port}`;
+}
+
+async function fetchMusicDetail(id: string) {
+  try {
+    const response = await fetch(`${await getBackendBase()}/api/music/query/${id}`, { cache: 'no-store' });
+    const data = await response.json();
+    return data.success ? data.data : { error: true, id, name: '查询失败或无版权' };
+  } catch {
+    return { error: true, id, name: '后端通信通道断开' };
+  }
+}
 
 function SettingsContent() {
   const { operations, addOperation } = useOperations();
@@ -31,7 +51,23 @@ function SettingsContent() {
     avatarUrl: siteConfig.avatarUrl || "",
     social: siteConfig.social || {},
     cloudMusicIds: [...(siteConfig.cloudMusicIds || [])],
+    musicTracks: [...((siteConfig.musicTracks || []) as MusicTrack[])],
+    musicSources: [...((siteConfig.musicSources || []) as MusicSourceConfig[])],
     bgImages: [...(siteConfig.bgImages || [])],
+    bgImageCrops: { ...(siteConfig.bgImageCrops || {}) },
+    picBedProvider: siteConfig.picBedProvider || 'dusays',
+    picBedProfiles: siteConfig.picBedProfiles || {
+      dusays: {
+        name: siteConfig.picBedName || 'Dusays 图床',
+        url: siteConfig.picBedUrl || '',
+        token: siteConfig.picBedToken || '',
+      },
+      'cloudflare-imgbed': {
+        name: 'CloudFlare-ImgBed',
+        url: 'https://imgbed.helloyuki.cn',
+        token: '',
+      },
+    },
     gitalkConfig: siteConfig.gitalkConfig || {
       clientID: '',
       clientSecret: '',
@@ -39,7 +75,6 @@ function SettingsContent() {
       owner: '',
       admin: []
     },
-    newMusicId: '',
     danmakuList: [...(siteConfig.danmakuList || [])],
     buildDate: siteConfig.buildDate || "2026-03-23T00:00:00",
     icpConfig: siteConfig.icpConfig || { name: "", link: "" },
@@ -54,16 +89,19 @@ function SettingsContent() {
   });
 
   const [queryLoading, setQueryLoading] = useState(false);
-  const [queryResult, setQueryResult] = useState<any>(null);
+  const [queryStage, setQueryStage] = useState<'searching' | 'verifying' | null>(null);
+  const [querySummary, setQuerySummary] = useState('');
+  const [queryResults, setQueryResults] = useState<any[]>([]);
   const [musicDetails, setMusicDetails] = useState<Record<string, any>>({});
+  const neteaseTrackKey: string = (formData.musicTracks || [])
+    .filter((track: MusicTrack) => track.platform === 'wy')
+    .map((track: MusicTrack) => track.id)
+    .join(',');
 
   useEffect(() => {
     const fetchRealConfig = async () => {
       try {
-        const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-        const configData = await configRes.json();
-
-        const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/config/get`, { cache: 'no-store' });
+        const res = await fetch(`${await getBackendBase()}/api/config/get`, { cache: 'no-store' });
         const data = await res.json();
 
         if (data.success && data.data) {
@@ -72,11 +110,27 @@ function SettingsContent() {
             ...prev,
             ...data.data,
             social: { ...(prev.social || {}), ...(data.data.social || {}) },
+            picBedProfiles: {
+              ...(prev.picBedProfiles || {}),
+              ...(data.data.picBedProfiles || {}),
+              dusays: {
+                ...(prev.picBedProfiles?.dusays || {}),
+                ...(data.data.picBedProfiles?.dusays || {}),
+              },
+              'cloudflare-imgbed': {
+                ...(prev.picBedProfiles?.['cloudflare-imgbed'] || {}),
+                ...(data.data.picBedProfiles?.['cloudflare-imgbed'] || {}),
+              },
+            },
             gitalkConfig: { ...(prev.gitalkConfig || {}), ...(data.data.gitalkConfig || {}) },
             danmakuList: data.data.danmakuList ? [...data.data.danmakuList] : prev.danmakuList,
             buildDate: data.data.buildDate || prev.buildDate,
             icpConfig: data.data.icpConfig || prev.icpConfig,
             footerBadges: data.data.footerBadges ? [...data.data.footerBadges] : prev.footerBadges,
+            musicTracks: data.data.musicTracks?.length
+              ? [...data.data.musicTracks]
+              : (data.data.cloudMusicIds || prev.cloudMusicIds || []).map((id: string | number) => ({ key: `wy:${id}`, platform: 'wy', id: String(id) })),
+            musicSources: data.data.musicSources ? [...data.data.musicSources] : prev.musicSources,
             // 👇 🌟 合并后端发来的小猫配置
             geminiConfig: { ...(prev.geminiConfig || {}), ...(data.data.geminiConfig || {}) }
           }));
@@ -97,76 +151,119 @@ function SettingsContent() {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
   };
 
-  const fetchMusicDetail = async (id: string) => {
-    try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/music/query/${id}`, { cache: 'no-store' });
-      const data = await res.json();
-      return data.success ? data.data : { error: true, id, name: "查询失败或无版权" };
-    } catch (error) {
-      return { error: true, id, name: "后端通信通道断开" };
-    }
-  };
-
   useEffect(() => {
+    let cancelled = false;
     const loadInitialMusicDetails = async () => {
-      const details: Record<string, any> = { ...musicDetails };
-      let hasUpdate = false;
-      for (const id of formData.cloudMusicIds || []) {
-        if (!details[id]) {
-          const info = await fetchMusicDetail(id);
-          if (info) {
-            details[id] = info;
-            hasUpdate = true;
-          }
-        }
-      }
-      if (hasUpdate) setMusicDetails(details);
+      const ids = neteaseTrackKey.split(',').filter(Boolean);
+      const entries = await Promise.all(ids.map(async (id) => [id, await fetchMusicDetail(id)] as const));
+      if (!cancelled) setMusicDetails((current) => ({ ...current, ...Object.fromEntries(entries) }));
     };
-    if (formData.cloudMusicIds?.length > 0) {
-      loadInitialMusicDetails();
-    }
-  }, [formData.cloudMusicIds]);
+    if (neteaseTrackKey) void loadInitialMusicDetails();
+    return () => { cancelled = true; };
+  }, [neteaseTrackKey]);
 
-  const queryMusic = async () => {
-    if (!formData.newMusicId) {
-      showToast("ID不能为空哦", "warning");
+  const queryMusic = async (query: string) => {
+    const keyword = query.trim();
+    if (!keyword) {
+      showToast("请输入歌曲名", "warning");
       return;
     }
     setQueryLoading(true);
-    setQueryResult(null);
+    setQueryStage('searching');
+    setQuerySummary('');
+    setQueryResults([]);
+    try {
+      const response = await fetch(`${await getBackendBase()}/api/music/search?query=${encodeURIComponent(keyword)}`, { cache: 'no-store' });
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message || '搜索失败');
+      const allCandidates = (result.data || []) as MusicTrack[];
+      if (allCandidates.length === 0) {
+        setQuerySummary('没有找到匹配歌曲');
+        showToast("没有找到匹配歌曲", "warning");
+        return;
+      }
 
-    const info = await fetchMusicDetail(formData.newMusicId);
-    if (info && !info.error) {
-      setQueryResult(info);
-      showToast("获取成功！", "success");
-    } else {
-      showToast(info?.name || "未找到该歌曲", "error");
+      const platformCounts = new Map<string, number>();
+      const candidates = allCandidates.filter((track) => {
+        const count = platformCounts.get(track.platform) || 0;
+        if (count >= 5) return false;
+        platformCounts.set(track.platform, count + 1);
+        return true;
+      });
+
+      setQueryStage('verifying');
+      const availabilityResponse = await fetch('/api/music/availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracks: candidates, sources: formData.musicSources || [] }),
+        cache: 'no-store',
+      });
+      const availabilityResult = await availabilityResponse.json();
+      if (!availabilityResponse.ok || !availabilityResult.success) {
+        throw new Error(availabilityResult.message || '歌曲可播放性验证失败');
+      }
+      const playableByKey = new Map<string, Record<string, unknown>>(
+        (availabilityResult.data || []).map((item: Record<string, unknown>) => [String(item.key), item]),
+      );
+      const playableResults = candidates.flatMap((track) => {
+        const availability = playableByKey.get(track.key);
+        return availability ? [{ ...track, ...availability, playable: true }] : [];
+      });
+      setQueryResults(playableResults);
+      setQuerySummary(`已验证 ${availabilityResult.checked || candidates.length} 首，过滤 ${availabilityResult.filtered || 0} 首不可播放歌曲`);
+      if (playableResults.length === 0) showToast("没有找到当前音源可播放的歌曲", "warning");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "搜索失败", "error");
+      setQuerySummary('搜索或可播放性验证失败，请稍后重试');
+    } finally {
+      setQueryLoading(false);
+      setQueryStage(null);
     }
-    setQueryLoading(false);
   };
 
   const removeSong = (index: number) => {
-    const newList = [...formData.cloudMusicIds];
-    newList.splice(index, 1);
-    handleUpdate('cloudMusicIds', newList);
+    const tracks = [...(formData.musicTracks || [])] as MusicTrack[];
+    const [removed] = tracks.splice(index, 1);
+    handleUpdate('musicTracks', tracks);
+    if (removed?.platform === 'wy') {
+      handleUpdate('cloudMusicIds', (formData.cloudMusicIds || []).filter((id: string | number) => String(id) !== removed.id));
+    }
     showToast("已移除一首歌曲", "success");
   };
 
-  const confirmAddMusic = () => {
-    if (!queryResult) return;
-    const targetId = String(queryResult.id);
-    const exists = formData.cloudMusicIds.some((id: string | number) => String(id) === targetId);
+  const addMusicTrack = (track: MusicTrack) => {
+    if ((formData.musicTracks || []).some((item: MusicTrack) => item.key === track.key)) {
+      showToast(`《${track.name || '这首歌'}》已经在歌单中`, "warning");
+      return false;
+    }
+    handleUpdate('musicTracks', [...(formData.musicTracks || []), track]);
+    if (track.platform === 'wy' && !(formData.cloudMusicIds || []).some((id: string | number) => String(id) === track.id)) {
+      handleUpdate('cloudMusicIds', [...(formData.cloudMusicIds || []), track.id]);
+      setMusicDetails(prev => ({ ...prev, [track.id]: track }));
+    }
+    showToast("已加入播放列表", "success");
+    return true;
+  };
 
-    if (exists) {
-      showToast(`⚠️ 《${queryResult.name}》已经在列表里啦，不要重复添加！`, "warning");
-    } else {
-      handleUpdate('cloudMusicIds', [...formData.cloudMusicIds, targetId]);
-      setMusicDetails(prev => ({ ...prev, [targetId]: queryResult }));
-      setQueryResult(null);
-      handleUpdate('newMusicId', '');
-      showToast("✅ 成功存入播放列表！", "success");
+  const saveMusicSettings = async (tracks: MusicTrack[], sources: MusicSourceConfig[]) => {
+    if (!sources.some((source) => source.enabled)) {
+      showToast('至少启用一个音源后才能保存', 'warning');
+      return false;
+    }
+    try {
+      const response = await fetch(`${await getBackendBase()}/api/config/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: { musicTracks: tracks, musicSources: sources, cloudMusicIds: formData.cloudMusicIds } }),
+      });
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message || '保存失败');
+      window.dispatchEvent(new Event(RUNTIME_SITE_CONFIG_UPDATED_EVENT));
+      showToast('音乐与音源配置已保存，Manager 播放器已刷新；同步部署后对线上博客生效', 'success');
+      return true;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '保存失败', 'error');
+      return false;
     }
   };
 
@@ -229,7 +326,7 @@ function SettingsContent() {
               {activeTab === 'profile' && <ProfileSection key="profile" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'display' && <DisplaySection key="display" />}
               {activeTab === 'background' && <BackgroundSection key="background" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
-              {activeTab === 'music' && <MusicSection key="music" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} musicDetails={musicDetails} queryMusic={queryMusic} queryLoading={queryLoading} queryResult={queryResult} confirmAddMusic={confirmAddMusic} removeSong={removeSong} />}
+              {activeTab === 'music' && <MusicSection key="music" formData={formData} handleUpdate={handleUpdate} musicDetails={musicDetails} queryMusic={queryMusic} queryLoading={queryLoading} queryStage={queryStage} querySummary={querySummary} queryResults={queryResults} addMusicTrack={addMusicTrack} removeSong={removeSong} saveMusicSettings={saveMusicSettings} />}
               {activeTab === 'gallery' && <GallerySection key="gallery" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'footer' && <FooterSection key="footer" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'danmaku' && <DanmakuSection key="danmaku" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}

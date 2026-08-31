@@ -17,18 +17,21 @@ import TaskItem from '@tiptap/extension-task-item';
 import { TableKit } from '@tiptap/extension-table';
 import { Plugin } from '@tiptap/pm/state';
 import { marked } from 'marked';
+import { normalizeEditorHtml } from '../../lib/editorHtml';
+import Btn from './EditorToolbarButton';
+import TableSizePicker from './TableSizePicker';
 
 // 🌟 引入满血版 C++ 语法高亮
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { createLowlight, all } from 'lowlight';
 
 import {
-  Undo2, Redo2, Eraser, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
+  Undo2, Redo2, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight, List, ListOrdered, ListTodo,
   Highlighter, Code2, Heading1, Heading2, Heading3,
   Type, ImageIcon, Quote, RemoveFormatting, ChevronDown,
-  Pipette, Hash, Check, Link2, Superscript as SupIcon, Subscript as SubIcon, Minus, Palette, Lock,
-  Table2, Rows3, Columns3, Trash2
+  Pipette, Hash, Check, Link2, Superscript as SupIcon, Subscript as SubIcon, Palette, Lock,
+  Rows3, Columns3, Trash2
 } from 'lucide-react';
 
 const lowlight = createLowlight(all);
@@ -53,7 +56,7 @@ const MarkdownPaste = Extension.create({
             const text = event.clipboardData?.getData('text/plain');
             if (!text || !hasMarkdownBlockSyntax(text)) return false;
 
-            const html = marked.parse(text, { gfm: true, async: false });
+            const html = normalizeEditorHtml(marked.parse(text, { gfm: true, async: false }));
             return editor.commands.insertContent(html);
           },
         },
@@ -85,7 +88,15 @@ const FontSize = Extension.create({
 
 // 🌟 终极修复：彻底废弃 absolute 下拉框，升级为 Fixed 居中模态框 (Modal)！
 // 这样就能 100% 逃脱父级容器的 overflow 限制，绝对不可能再被遮挡！
-const CustomColorPicker = ({ activeColor, onSelect, onConfirm, recentColors, onClose }: any) => {
+type CustomColorPickerProps = {
+  activeColor: string;
+  onSelect: (color: string) => void;
+  onConfirm: (color: string) => void;
+  recentColors: string[];
+  onClose: () => void;
+};
+
+const CustomColorPicker = ({ activeColor, onSelect, onConfirm, recentColors, onClose }: CustomColorPickerProps) => {
   const presets = ['#000000', '#6366F1', '#EC4899', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6'];
   const [hex, setHex] = useState(activeColor);
   return (
@@ -191,7 +202,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
       }),
       MarkdownPaste,
     ],
-    content: initialContent || '',
+    content: normalizeEditorHtml(initialContent || ''),
     immediatelyRender: false,
     onUpdate: () => {
       if (onChange) onChange();
@@ -223,10 +234,11 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
   }), [editor, onChange]);
 
   useEffect(() => {
-    if (!editor || !initialContent) return;
-    if (loadedContentRef.current !== initialContent) {
-      editor.commands.setContent(initialContent, { emitUpdate: false });
-      loadedContentRef.current = initialContent;
+    if (!editor) return;
+    const normalizedContent = normalizeEditorHtml(initialContent || '');
+    if (loadedContentRef.current !== normalizedContent) {
+      editor.commands.setContent(normalizedContent, { emitUpdate: false });
+      loadedContentRef.current = normalizedContent;
     }
   }, [editor, initialContent]);
 
@@ -249,17 +261,6 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
     const safeUrl = /^https?:\/\//.test(url) ? url : `https://${url}`;
     editor.chain().focus().extendMarkRange('link').setLink({ href: safeUrl }).run();
   };
-
-  const Btn = ({ onClick, active, children, title }: any) => (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`p-2.5 rounded-xl transition-all duration-300 ease-out flex items-center justify-center 
-        ${active ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/40 scale-110' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}
-    >
-      {children}
-    </button>
-  );
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 bg-transparent relative">
@@ -441,14 +442,13 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
           <Btn onClick={() => editor.chain().focus().toggleSuperscript().run()} active={editor.isActive('superscript')}><SupIcon size={16}/></Btn>
           <Btn onClick={() => editor.chain().focus().toggleSubscript().run()} active={editor.isActive('subscript')}><SubIcon size={16}/></Btn>
           <Btn onClick={toggleLink} active={editor.isActive('link')}><Link2 size={16}/></Btn>
-          <Btn onClick={onOpenImageTool}><ImageIcon size={16} className="text-indigo-500"/></Btn>
-          <Btn
-            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          <Btn onClick={onOpenImageTool} title="添加图片"><ImageIcon size={16} className="text-indigo-500"/></Btn>
+          <TableSizePicker
             active={editor.isActive('table')}
-            title="插入 3×3 表格"
-          >
-            <Table2 size={16} />
-          </Btn>
+            onInsert={({ rows, cols, withHeaderRow }) => {
+              editor.chain().focus().insertTable({ rows, cols, withHeaderRow }).run();
+            }}
+          />
         </div>
 
         {editor.isActive('table') && (

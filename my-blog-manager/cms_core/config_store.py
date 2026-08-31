@@ -12,29 +12,26 @@ from typing import Any, Mapping
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "data" / "site_config.json"
 MANAGER_TS_PATH = PROJECT_ROOT / "siteConfig.ts"
-DEFAULT_CONFIG_PATH = PROJECT_ROOT.parent / "scripts" / "siteConfig.defaults.json"
 
-PRIVATE_KEYS = {"picBedName", "picBedUrl", "picBedToken"}
+PRIVATE_KEYS = {
+    "picBedName",
+    "picBedUrl",
+    "picBedToken",
+    "picBedProvider",
+    "picBedProfiles",
+}
 VALID_ROOT_KEYS = {
     "title", "siteUrl", "authorName", "bio", "avatarUrl", "useGradient", "themeColors",
-    "bgImages", "defaultPostCover", "photoWallImage", "cloudMusicIds", "social",
+    "bgImages", "bgImageCrops", "defaultPostCover", "photoWallImage", "cloudMusicIds", "musicTracks",
+    "musicSources", "social",
     "counts", "chatterTitle", "chatterDescription", "picBedName", "picBedUrl",
-    "picBedToken", "danmakuList", "gitalkConfig", "buildDate", "footerBadges",
+    "picBedToken", "picBedProvider", "picBedProfiles", "danmakuList", "gitalkConfig", "buildDate", "footerBadges",
     "icpConfig", "geminiConfig", "faviconUrl", "navTitle", "navSuffix",
     "navAfter", "friendLinkApplyFormat", "enableLevelSystem",
 }
 
 
 def load_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
-    if not path.exists():
-        if not DEFAULT_CONFIG_PATH.exists():
-            raise FileNotFoundError(f"Missing configuration template: {DEFAULT_CONFIG_PATH}")
-        with DEFAULT_CONFIG_PATH.open("r", encoding="utf-8") as handle:
-            defaults = json.load(handle)
-        if not isinstance(defaults, dict):
-            raise ValueError("siteConfig.defaults.json must contain an object")
-        atomic_write_json(path, defaults)
-
     with path.open("r", encoding="utf-8") as handle:
         data = json.load(handle)
     if not isinstance(data, dict):

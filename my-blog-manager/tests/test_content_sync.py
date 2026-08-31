@@ -63,12 +63,23 @@ class AboutSyncTests(unittest.TestCase):
             root = Path(directory)
             manager = root / "manager"
             frontend = root / "myBlogs"
-            for relative in ["posts", "chatters", "moments", "app/about", "data", "public/uploads/covers"]:
+            for relative in [
+                "posts",
+                "chatters",
+                "moments",
+                "app/about",
+                "components",
+                "data",
+                "lib",
+                "public/uploads/covers",
+            ]:
                 (manager / relative).mkdir(parents=True, exist_ok=True)
             (manager / "app" / "about" / "about.md").write_text("about", encoding="utf-8")
             (manager / "data" / "albums.ts").write_text("albums", encoding="utf-8")
             (manager / "data" / "friends.ts").write_text("friends", encoding="utf-8")
             (manager / "data" / "projects.ts").write_text("projects", encoding="utf-8")
+            (manager / "components" / "CroppedBackgroundImage.tsx").write_text("export default function Crop() {}", encoding="utf-8")
+            (manager / "lib" / "backgroundCrop.ts").write_text("export const crop = true;", encoding="utf-8")
             (manager / "public" / "uploads" / "covers" / "cover-test.jpg").write_bytes(b"cover")
             (manager / "siteConfig.ts").write_text("manager config", encoding="utf-8")
 
@@ -93,6 +104,14 @@ class AboutSyncTests(unittest.TestCase):
             self.assertEqual(
                 (frontend / "public" / "uploads" / "covers" / "cover-test.jpg").read_bytes(),
                 b"cover",
+            )
+            self.assertEqual(
+                (frontend / "lib" / "backgroundCrop.ts").read_text(encoding="utf-8"),
+                "export const crop = true;",
+            )
+            self.assertEqual(
+                (frontend / "components" / "CroppedBackgroundImage.tsx").read_text(encoding="utf-8"),
+                "export default function Crop() {}",
             )
 
     def test_about_publish_is_mirrored_to_configured_frontend(self):
