@@ -6,11 +6,12 @@ This project is derived from [XinghuisamaBlogs](https://github.com/heiehiehi/Xin
 
 [English](README_en.md) · [中文](README.md) · [Changelog](UpdateLog.md)
 
-## 2026-08-21 update summary
+## 2026-08-31 update summary
 
-- Rebuilt the public source tree as a reusable snapshot without personal posts, site configuration, deployment paths, or credentials, and added a pre-publish privacy check.
-- Clarified first-run initialization, incremental updates, and EdgeOne Pages deployment while preserving local content and configuration during upgrades.
-- Fixed missing borders on Markdown tables in article views, including light/dark styling, zebra rows, and horizontal scrolling on mobile.
+- Synchronized the latest privacy-clean Manager and blog frontend source, including multi-source music search, availability filtering, previews, and streaming playback.
+- Added cloud image-bed batch uploads, background display-area cropping, improved editor image and table interactions, safer draft synchronization, and article update timestamps.
+- Improved Manager window and drag interactions while expanding public-repository exclusions for runtime data, private configuration, and personal content.
+- The pre-publish safety scan, type checks, lint, 59 automated tests, and both production builds passed. See the [changelog](UpdateLog.md) for details.
 
 ## Architecture and deployment
 
