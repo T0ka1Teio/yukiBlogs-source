@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { useMusic } from './MusicProvider';
 // 🌟 核心引入：Next.js 路由钩子
 import { useRouter } from 'next/navigation';
@@ -12,7 +13,11 @@ const formatTime = (time: number) => {
 };
 
 export default function CloudPlayer() {
-  const { playlist, currentSong, isPlaying, progress, currentTime, duration, currentLyric, isLoading, togglePlay, nextSong, prevSong, handleSeek } = useMusic();
+  const { playlist, currentSong, isPlaying, progress, currentTime, duration, currentLyric, isLoading, togglePlay, nextSong, prevSong, handleSeek, volume, setVolume, isMuted, toggleMute } = useMusic();
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const volumePanelId = useId();
+  const volumeButtonRef = useRef<HTMLButtonElement>(null);
+  const audibleVolume = isMuted ? 0 : volume;
   const [displayedLyric, setDisplayedLyric] = useState("");
   // 🌟 初始化路由
   const router = useRouter();
@@ -141,7 +146,7 @@ export default function CloudPlayer() {
           </div>
 
           {/* 🌟 核心拦截：使用我们上面写的 safe 函数，阻止事件冒泡 */}
-          <div className="flex items-center justify-center gap-6">
+          <div className="relative flex items-center justify-center gap-6">
             <button onClick={safePrevSong} className="text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors drop-shadow-sm relative z-20">
                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
             </button>
@@ -153,6 +158,48 @@ export default function CloudPlayer() {
             <button onClick={safeNextSong} className="text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors drop-shadow-sm relative z-20">
                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
             </button>
+            <div
+              className="absolute right-0 z-30"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setShowVolumeSlider(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setShowVolumeSlider(false);
+                  volumeButtonRef.current?.focus();
+                }
+              }}
+            >
+              {showVolumeSlider && (
+                <div id={volumePanelId} className="absolute bottom-full right-0 pb-2">
+                  <div className="flex items-center gap-2 rounded-full border border-white/30 bg-white/95 dark:bg-slate-900/95 p-3 shadow-lg">
+                    <button type="button" onClick={toggleMute} aria-label={isMuted ? '取消静音' : '静音'} className="text-indigo-500 rounded-full focus-visible:outline-2 focus-visible:outline-indigo-500">
+                      {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                    </button>
+                    <input
+                      type="range" min="0" max="1" step="0.01"
+                      aria-label="音量" aria-valuetext={`${Math.round(audibleVolume * 100)}%`}
+                      value={audibleVolume}
+                      onChange={(event) => setVolume(Number(event.target.value))}
+                      className="w-24 h-1.5 appearance-none rounded-full cursor-pointer focus-visible:outline-2 focus-visible:outline-indigo-500"
+                      style={{ background: `linear-gradient(to right, #6366f1 ${audibleVolume * 100}%, rgba(148,163,184,0.4) ${audibleVolume * 100}%)` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <button
+                ref={volumeButtonRef} type="button"
+                aria-label="调节音量" aria-expanded={showVolumeSlider} aria-controls={volumePanelId}
+                title="调节音量，双击静音"
+                onClick={() => setShowVolumeSlider(value => !value)}
+                onDoubleClick={toggleMute}
+                className={`p-2 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500 ${showVolumeSlider ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-700 dark:text-slate-300 hover:text-indigo-500'}`}
+              >
+                {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+            </div>
           </div>
         </div>
       </div>

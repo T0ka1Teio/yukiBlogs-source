@@ -24,6 +24,7 @@ const forbiddenPaths = new Set([
 ]);
 
 const forbiddenPrefixes = [
+  'myBlogs/.cache/',
   'picture/',
   'my-blog-manager/posts/',
   'my-blog-manager/chatters/',

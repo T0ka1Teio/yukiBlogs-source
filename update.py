@@ -74,6 +74,7 @@ def main():
         "myBlogs/app/timeline", "myBlogs/app/globals.css", "myBlogs/app/layout.tsx",
         "myBlogs/app/page.tsx", "myBlogs/components", "myBlogs/public", "myBlogs/app/tree",
         "myBlogs/.gitignore", "myBlogs/package.json", "myBlogs/package-lock.json",
+        "myBlogs/scripts", "myBlogs/tests",
         "myBlogs/postcss.config.mjs", "myBlogs/tsconfig.json", "myBlogs/next.config.ts",
 
         # 后台文件

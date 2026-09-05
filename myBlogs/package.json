@@ -4,15 +4,17 @@
   "private": true,
   "scripts": {
     "config:init": "node ../scripts/checkConfig.mjs",
-    "predev": "npm run config:init",
+    "predev": "npm run config:init && npm run gallery:previews",
     "dev": "next dev",
-    "prebuild": "npm run config:init",
+    "prebuild": "npm run config:init && npm run gallery:previews",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "pretypecheck": "npm run config:init",
     "typecheck": "tsc --noEmit --pretty false",
-    "test:stats": "node --test tests/statsStore.test.mts"
+    "test:stats": "node --test tests/statsStore.test.mts",
+    "gallery:previews": "node scripts/generate-gallery-previews.mjs",
+    "test:gallery": "node --test tests/galleryPreviews.test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -54,7 +56,8 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "three": "^0.184.0",
-    "unified": "^11.0.5"
+    "unified": "^11.0.5",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
