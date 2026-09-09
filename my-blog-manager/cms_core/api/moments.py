@@ -19,6 +19,8 @@ class MomentPayload(BaseModel):
 @router.post("/save")
 def save_moment(payload: MomentPayload):
     try:
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", payload.id):
+            return {"success": False, "message": "说说 ID 不合法"}
         # 🌟 绝对路径修复魔法 🌟
         # 1. 获取当前 moments.py 文件所在的绝对路径 (也就是 cms_core/api 目录)
         current_dir = os.path.dirname(os.path.abspath(__file__))

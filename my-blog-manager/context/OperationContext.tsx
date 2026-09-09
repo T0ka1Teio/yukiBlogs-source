@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 // 定义操作的类型
 export type OperationType =
@@ -49,6 +49,19 @@ const OperationContext = createContext<OperationContextType | undefined>(undefin
 
 export function OperationProvider({ children }: { children: React.ReactNode }) {
   const [operations, setOperations] = useState<Operation[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('yukiblogs.operations');
+      if (saved) setOperations(JSON.parse(saved));
+    } catch { /* ignore corrupt browser state */ }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('yukiblogs.operations', JSON.stringify(operations));
+  }, [operations, hydrated]);
 
   // 添加操作（如果同类型的操作已存在，则覆盖，防止重复积攒）
   const addOperation = (op: OperationInput) => {

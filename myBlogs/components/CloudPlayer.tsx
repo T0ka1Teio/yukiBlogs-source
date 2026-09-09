@@ -159,7 +159,8 @@ export default function CloudPlayer() {
                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
             </button>
             <div
-              className="absolute right-0 z-30"
+              className="absolute z-30"
+              style={{ right: 'clamp(0px, calc(50% - 112px), 24px)' }}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
               onBlur={(event) => {
@@ -173,18 +174,18 @@ export default function CloudPlayer() {
               }}
             >
               {showVolumeSlider && (
-                <div id={volumePanelId} className="absolute bottom-full right-0 pb-2">
-                  <div className="flex items-center gap-2 rounded-full border border-white/30 bg-white/95 dark:bg-slate-900/95 p-3 shadow-lg">
+                <div id={volumePanelId} className="absolute bottom-full left-1/2 -translate-x-1/2 pb-2">
+                  <div className="flex flex-col items-center gap-2 rounded-full border border-white/30 bg-white/95 dark:bg-slate-900/95 p-3 shadow-lg">
                     <button type="button" onClick={toggleMute} aria-label={isMuted ? '取消静音' : '静音'} className="text-indigo-500 rounded-full focus-visible:outline-2 focus-visible:outline-indigo-500">
                       {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
                     </button>
                     <input
                       type="range" min="0" max="1" step="0.01"
-                      aria-label="音量" aria-valuetext={`${Math.round(audibleVolume * 100)}%`}
+                      aria-label="音量" aria-orientation="vertical" aria-valuetext={`${Math.round(audibleVolume * 100)}%`}
                       value={audibleVolume}
                       onChange={(event) => setVolume(Number(event.target.value))}
-                      className="w-24 h-1.5 appearance-none rounded-full cursor-pointer focus-visible:outline-2 focus-visible:outline-indigo-500"
-                      style={{ background: `linear-gradient(to right, #6366f1 ${audibleVolume * 100}%, rgba(148,163,184,0.4) ${audibleVolume * 100}%)` }}
+                      className="w-1.5 h-24 appearance-none rounded-full cursor-pointer focus-visible:outline-2 focus-visible:outline-indigo-500"
+                      style={{ writingMode: 'vertical-lr', direction: 'rtl', background: `linear-gradient(to top, #6366f1 ${audibleVolume * 100}%, rgba(148,163,184,0.4) ${audibleVolume * 100}%)` }}
                     />
                   </div>
                 </div>

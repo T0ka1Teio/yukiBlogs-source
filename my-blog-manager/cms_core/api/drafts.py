@@ -8,6 +8,7 @@ from datetime import datetime
 from html import unescape
 from pathlib import Path
 import re
+import uuid
 import markdown  # 确保你已经安装了 markdown 库 (pip install markdown)
 from markdownify import markdownify as md
 from cms_core.api.sync import delete_document_from_configured_blog, sync_about_to_configured_blog
@@ -34,6 +35,12 @@ HTML_CODE_BLOCK_PATTERN = re.compile(
     r"(<pre><code(?:\s+[^>]*)?>)(.*?)(</code></pre>)",
     re.DOTALL | re.IGNORECASE,
 )
+DOCUMENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._-]*\Z")
+
+def _safe_document_id(value):
+    if not isinstance(value, str) or not DOCUMENT_ID_PATTERN.fullmatch(value):
+        raise ValueError("文档 ID 不合法")
+    return value
 
 
 def _mirror_local_cover_to_runtime(cover_url: object) -> bool:
@@ -162,7 +169,7 @@ async def import_markdown_draft(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
     now = int(time.time() * 1000)
-    draft_id = f"draft_{now}"
+        draft_id = f"draft_{now}_{uuid.uuid4().hex[:8]}"
     draft_data = {
         "id": draft_id,
         **imported,
@@ -202,9 +209,14 @@ async def save_draft(request: Request):
     draft_id = payload.get("id")
 
     if not draft_id or draft_id == 'new':
-        draft_id = f"draft_{int(time.time() * 1000)}"
+        draft_id = f"draft_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
     elif payload.get("type") == "about":
         draft_id = "about"
+    else:
+        try:
+            draft_id = _safe_document_id(str(draft_id))
+        except ValueError as error:
+            return {"success": False, "message": str(error)}
 
     draft_data = {
         "id": draft_id,
@@ -336,36 +348,39 @@ async def delete_draft(request: Request):
     except Exception:
         return {"success": False, "message": "JSON 解析失败"}
 
-    raw_id = payload.get("id", "").replace(".md", "").replace(".json", "")
-    doc_type = payload.get("type", "")
-    if not re.fullmatch(r"[A-Za-z0-9._-]+", raw_id):
+    if not isinstance(payload, dict):
+        return {"success": False, "message": "删除参数必须是对象"}
+    document_id = payload.get("id", "")
+    doc_type = payload.get("type", "draft")
+    if not isinstance(document_id, str):
         return {"success": False, "message": "文档 ID 不合法"}
-    # 🌟 修复：用 PROJECT_ROOT 替换 os.getcwd()
-    base_dir = PROJECT_ROOT
-    drafts_dir = get_manager_drafts_dir()
+    raw_id = re.sub(r"\.(md|json)$", "", document_id)
+    if not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", raw_id):
+        return {"success": False, "message": "文档 ID 不合法"}
+    if doc_type not in ("draft", "post", "chatter"):
+        return {"success": False, "message": "删除类型不合法"}
 
-    possible_paths = [
-        os.path.join(drafts_dir, f"{raw_id}.json"),
-        os.path.join(base_dir, "posts", f"{raw_id}.md"),
-        os.path.join(base_dir, "chatters", f"{raw_id}.md")
-    ]
+    # A draft can share its ID with published content. Delete only the requested kind.
+    if doc_type == "draft":
+        target = os.path.join(get_manager_drafts_dir(), f"{raw_id}.json")
+    else:
+        folder = "posts" if doc_type == "post" else "chatters"
+        target = os.path.join(PROJECT_ROOT, folder, f"{raw_id}.md")
 
-    deleted_count = 0
-    for p in possible_paths:
-        if os.path.exists(p):
-            try:
-                os.remove(p)
-                deleted_count += 1
-            except:
-                continue
+    try:
+        os.remove(target)
+    except FileNotFoundError:
+        pass  # Retries after a successful local deletion are safe.
+    except OSError as error:
+        return {"success": False, "message": f"删除失败: {error}"}
 
-    frontend_message = ""
-    if doc_type in {"post", "chatter"}:
-        _, frontend_message = delete_document_from_configured_blog(doc_type, raw_id)
+    if doc_type == "draft":
+        return {"success": True, "message": "草稿已删除，已发布内容保持不变"}
 
-    if deleted_count > 0:
-        return {"success": True, "message": f"已彻底销毁相关文件；{frontend_message}"}
-    return {"success": True, "message": "文件已不存在，已按删除成功处理"}
+    synced, message = delete_document_from_configured_blog(doc_type, raw_id)
+    if not synced:
+        return {"success": False, "message": f"本地内容已删除，但前端删除未完成，可重试：{message}"}
+    return {"success": True, "message": f"已删除指定内容；{message}"}
 
 
 @router.post("/sync_local")
@@ -383,8 +398,17 @@ async def sync_local_operations(request: Request):
             doc_id = data.get("id", "")
 
             final_id = doc_id
+            if doc_type not in {"post", "chatter", "about"}:
+                results.append("❌ 文档类型不合法")
+                continue
             if not final_id or final_id == 'new' or str(final_id).startswith('draft_'):
-                final_id = f"{doc_type}_{int(time.time())}"
+                final_id = f"{doc_type}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
+            elif doc_type != "about":
+                try:
+                    final_id = _safe_document_id(str(final_id))
+                except ValueError as error:
+                    results.append(f"❌ {error}")
+                    continue
 
             # ==========================================
             # 🌟 核心防吞空行逻辑：在给 markdownify 之前拦截处理 HTML

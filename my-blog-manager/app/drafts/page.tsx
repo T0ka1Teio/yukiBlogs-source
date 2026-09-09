@@ -102,7 +102,7 @@ function DraftsContent() {
       const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/drafts/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id, type: 'draft' })
       });
 
       const data = await res.json();

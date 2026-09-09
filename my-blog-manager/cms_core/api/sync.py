@@ -1,6 +1,7 @@
 import os
 import shutil
 import json
+import tempfile
 from pathlib import Path
 from fastapi import APIRouter, Request
 
@@ -162,9 +163,18 @@ def sync_blog_tree(target_path):
             dst_dir = os.path.join(target_path, d)
 
             if os.path.exists(src_dir):
-                if os.path.exists(dst_dir):
-                    shutil.rmtree(dst_dir)
-                shutil.copytree(src_dir, dst_dir)
+                staging = tempfile.mkdtemp(prefix=f".{Path(d).name}-", dir=target_path)
+                staged_dir = os.path.join(staging, Path(d).name)
+                backup = f"{dst_dir}.bak"
+                try:
+                    shutil.copytree(src_dir, staged_dir)
+                    if os.path.exists(dst_dir):
+                        if os.path.exists(backup): shutil.rmtree(backup)
+                        os.replace(dst_dir, backup)
+                    os.replace(staged_dir, dst_dir)
+                    if os.path.exists(backup): shutil.rmtree(backup)
+                finally:
+                    shutil.rmtree(staging, ignore_errors=True)
 
         # 2. 同步单个文件 (直接覆盖或过滤)
         for f in SYNC_FILES:

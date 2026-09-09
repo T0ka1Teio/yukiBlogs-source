@@ -146,10 +146,13 @@ async function downloadScript(scriptUrl: string) {
   return script
 }
 
-async function loadSource(scriptUrl: string): Promise<LoadedSource> {
+async function loadSource(scriptUrl: string, expectedSha256?: string): Promise<LoadedSource> {
   const script = await downloadScript(scriptUrl)
   const metadata = parseMetadata(script)
   const sha256 = createHash('sha256').update(script).digest('hex')
+  if (expectedSha256 && sha256 !== expectedSha256) {
+    throw new Error('远程音源脚本已变化，请在 Manager 中重新测试后保存')
+  }
   const handlers = new Map<string, (...args: never[]) => unknown>()
   let resolveInit!: (payload: LxInitPayload) => void
   let rejectInit!: (error: Error) => void
@@ -228,12 +231,7 @@ function loadConfiguredSource(source: MusicSourceConfig) {
     if (!oldestKey) break
     loadedSourceCache.delete(oldestKey)
   }
-  const promise = loadSource(source.scriptUrl).then((loaded) => {
-    if (source.sha256 && loaded.sha256 !== source.sha256) {
-      throw new Error('远程音源脚本已变化，请在 Manager 中重新测试后保存')
-    }
-    return loaded
-  })
+  const promise = loadSource(source.scriptUrl, source.sha256)
   const entry = { expiresAt: Date.now() + SOURCE_CACHE_TTL_MS, promise }
   loadedSourceCache.set(cacheKey, entry)
   void promise.catch(() => {

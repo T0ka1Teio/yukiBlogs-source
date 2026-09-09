@@ -9,7 +9,7 @@ const templatesDir = path.join(scriptsDir, 'templates');
 const dataPath = path.join(root, 'my-blog-manager', 'data', 'site_config.json');
 const managerPath = path.join(root, 'my-blog-manager', 'siteConfig.ts');
 const blogPath = path.join(root, 'myBlogs', 'siteConfig.ts');
-const privateKeys = new Set(['picBedName', 'picBedUrl', 'picBedToken']);
+const privateKeys = new Set(['picBedName', 'picBedUrl', 'picBedToken', 'picBedProfiles']);
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));

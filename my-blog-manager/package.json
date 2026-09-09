@@ -3,14 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "config:init": "node ../scripts/checkConfig.mjs",
-    "predev": "npm run config:init",
     "dev": "next dev",
-    "prebuild": "npm run config:init",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "pretypecheck": "npm run config:init",
     "typecheck": "tsc --noEmit --pretty false",
     "test": "python -m unittest discover -s tests -v"
   },
@@ -56,6 +52,7 @@
     "remark-math": "^6.0.0",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
+    "sharp": "0.35.4",
     "three": "^0.184.0",
     "unified": "^11.0.5"
   },

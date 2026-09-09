@@ -64,6 +64,50 @@ class DraftSyncTests(unittest.TestCase):
             },
         )
 
+    def _write_published(self, folder: str, document_id: str) -> Path:
+        target = self.project_root / folder / f"{document_id}.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("published content", encoding="utf-8")
+        return target
+
+    def test_deleting_draft_never_deletes_same_id_published_content(self):
+        for payload in ({"id": "post_123"}, {"id": "post_123", "type": "draft"}):
+            with self.subTest(payload=payload):
+                draft = self._write_draft("post_123", "文章草稿")
+                post = self._write_published("posts", "post_123")
+                chatter = self._write_published("chatters", "post_123")
+                with patch.object(drafts, "delete_document_from_configured_blog") as mirror:
+                    result = self.client.post("/api/drafts/delete", json=payload).json()
+                    self.assertTrue(result["success"])
+                    self.assertFalse(draft.exists())
+                    self.assertEqual(post.read_text(), "published content")
+                    self.assertEqual(chatter.read_text(), "published content")
+                    mirror.assert_not_called()
+
+    def test_published_deletion_is_scoped_and_retryable(self):
+        for doc_type, folder, other in (("post", "posts", "chatters"), ("chatter", "chatters", "posts")):
+            with self.subTest(doc_type=doc_type):
+                draft = self._write_draft("shared", "保留草稿")
+                target = self._write_published(folder, "shared")
+                unrelated = self._write_published(other, "shared")
+                payload = {"id": "shared", "type": doc_type}
+                with patch.object(drafts, "delete_document_from_configured_blog", side_effect=[(False, "offline"), (True, "done")]) as mirror:
+                    self.assertFalse(self.client.post("/api/drafts/delete", json=payload).json()["success"])
+                    self.assertFalse(target.exists())
+                    self.assertTrue(self.client.post("/api/drafts/delete", json=payload).json()["success"])
+                    self.assertEqual(mirror.call_count, 2)
+                    mirror.assert_called_with(doc_type, "shared")
+                self.assertTrue(draft.exists())
+                self.assertTrue(unrelated.exists())
+
+    def test_invalid_deletion_and_io_failure_do_not_report_success(self):
+        draft = self._write_draft("post_123", "保留")
+        for payload in ([], {"id": 123}, {"id": "../post_123"}, {"id": "post_123", "type": "all"}):
+            self.assertFalse(self.client.post("/api/drafts/delete", json=payload).json()["success"])
+        with patch.object(drafts.os, "remove", side_effect=PermissionError("locked")):
+            self.assertFalse(self.client.post("/api/drafts/delete", json={"id": "post_123"}).json()["success"])
+        self.assertTrue(draft.exists())
+
     def test_update_local_preserves_every_draft(self):
         published_draft = self._write_draft("draft_1001", "准备发布")
         untouched_draft = self._write_draft("draft_1002", "仍在编辑")
